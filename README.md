@@ -32,16 +32,16 @@ BrightToDo 是一个面向学生学习场景的智能任务管理系统，也是
 
 ## 技术栈
 
-| 模块 | 技术 |
-|---|---|
-| 后端 | Python 3.12, FastAPI, SQLModel, SQLAlchemy |
-| 数据存储 | SQLite, ChromaDB |
-| AI 集成 | OpenAI API, DashScope, Agno Agent Framework |
-| OCR 与图像处理 | RapidOCR, Pillow, OpenCV |
-| 前端 | Next.js, React, TypeScript |
-| UI 与交互 | Radix UI, Tailwind CSS, dnd-kit |
-| 桌面端 | Electron, Tauri |
-| 工程工具 | uv, pnpm, Ruff, Biome |
+| 模块           | 技术                                        |
+| -------------- | ------------------------------------------- |
+| 后端           | Python 3.12, FastAPI, SQLModel, SQLAlchemy  |
+| 数据存储       | SQLite, ChromaDB                            |
+| AI 集成        | OpenAI API, DashScope, Agno Agent Framework |
+| OCR 与图像处理 | RapidOCR, Pillow, OpenCV                    |
+| 前端           | Next.js, React, TypeScript                  |
+| UI 与交互      | Radix UI, Tailwind CSS, dnd-kit             |
+| 桌面端         | Electron, Tauri                             |
+| 工程工具       | uv, pnpm, Ruff, Biome                       |
 
 ## 目录结构
 
@@ -50,7 +50,7 @@ BrightToDo 是一个面向学生学习场景的智能任务管理系统，也是
 ├── lifetrace/              # FastAPI 后端、服务层、数据访问、LLM 与 Agent 相关模块
 ├── lifetrace/config/       # 运行配置，config.yaml 由 default_config.yaml 生成
 ├── lifetrace/data/         # 运行期数据目录，本地数据库和向量库不应提交
-├── free-todo-frontend/     # Next.js 前端、Electron/Tauri 桌面端封装和脚本
+├── frontend/     # Next.js 前端、Electron/Tauri 桌面端封装和脚本
 ├── docs/                   # 课程项目文档、立项报告、冲刺计划和开发计划
 ├── tests/                  # 后端测试
 └── scripts/                # 项目辅助脚本
@@ -110,11 +110,11 @@ pnpm type-check
 
 项目周期为 2026-04-28 至 2026-06-23，采用两轮核心 Sprint 推进。
 
-| 阶段 | 时间 | 目标 |
-|---|---|---|
-| Sprint 1 | 2026-05-12 至 2026-05-25 | 完成 FreeTodo 复用验证，并交付“自然语言输入 -> AI 解析 -> 用户确认 -> 创建待办”的端到端闭环 |
-| Sprint 2 | 2026-05-26 至 2026-06-08 | 完成课表/手稿 OCR、识别结果确认、智能日程编排和 Agent 主入口集成 |
-| 稳定化与答辩 | 2026-06-09 至 2026-06-23 | 回归测试、缺陷修复、文档整理、演示准备和课程答辩 |
+| 阶段         | 时间                     | 目标                                                                                          |
+| ------------ | ------------------------ | --------------------------------------------------------------------------------------------- |
+| Sprint 1     | 2026-05-12 至 2026-05-25 | 完成 FreeTodo 复用验证，并交付“自然语言输入 -> AI 解析 -> 用户确认 -> 创建待办”的端到端闭环 |
+| Sprint 2     | 2026-05-26 至 2026-06-08 | 完成课表/手稿 OCR、识别结果确认、智能日程编排和 Agent 主入口集成                              |
+| 稳定化与答辩 | 2026-06-09 至 2026-06-23 | 回归测试、缺陷修复、文档整理、演示准备和课程答辩                                              |
 
 ## 文档
 
