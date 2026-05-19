@@ -64,6 +64,27 @@ BrightToDo 是一个面向学生学习场景的智能任务管理系统，也是
 - Node.js 与 pnpm
 - uv
 
+### 一键启动
+
+Windows：
+
+```bat
+start.bat
+```
+
+macOS / Linux：
+
+```bash
+bash scripts/start_dev.sh
+```
+
+脚本会自动检查开发环境，安装缺失的 `uv` / `pnpm`，同步后端和前端依赖，生成本地 `lifetrace/config/config.yaml`（如果缺失），并同时启动后端与前端。启动成功后访问：
+
+- 前端：`http://localhost:3001`
+- 后端健康检查：`http://127.0.0.1:8001/health`
+
+按 `Ctrl+C` 可同时停止前后端服务。
+
 ### 后端启动
 
 在仓库根目录执行：
