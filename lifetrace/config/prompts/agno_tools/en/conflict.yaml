@@ -1,0 +1,6 @@
+# Conflict Detection Tool Messages - English
+
+conflict_found: "Found {count} conflict(s) in {time_range}:\n{conflicts}"
+conflict_item: "- #{id} {name} ({start} - {end})"
+no_conflict: "No conflicts in {time_range}, available for scheduling"
+conflict_failed: "Conflict check failed: {error}"

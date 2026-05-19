@@ -1,0 +1,4 @@
+# Time Parsing Tool Messages - English
+
+parse_time_success: "Parsed result: {result}"
+parse_time_failed: "Cannot parse time expression \"{expression}\": {error}"

@@ -1,0 +1,15 @@
+# Statistics Tool Messages - English
+
+# Stats
+stats_header: "Todo Statistics ({date_range}):\n"
+stats_total: "- Total: {total}"
+stats_completed: "- Completed: {completed}"
+stats_active: "- Active: {active}"
+stats_overdue: "- Overdue: {overdue}"
+stats_by_priority: "- By priority: High({high}) Medium({medium}) Low({low}) None({none})"
+stats_failed: "Failed to get statistics: {error}"
+
+# Overdue
+overdue_header: "Overdue todos ({count} items):\n"
+overdue_item: "- #{id} {name} (overdue by {days} days)"
+no_overdue: "No overdue todos"

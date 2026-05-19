@@ -1,0 +1,471 @@
+@import url("https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap");
+@import "tailwindcss";
+
+/* Tailwind v4 自定义 dark 模式变体 - 基于 .dark 类 */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* Tailwind v4 语义色令牌映射：
+ * 让组件可以优雅地使用 bg-background、text-foreground、bg-primary/10 等语义类，
+ * 而不需要在每个地方手写 bg-[oklch(var(--xxx)/0.xx)] 这种“细节色”。
+ */
+@theme {
+	/* 全局无衬线字体，使用 next/font 注入的 CSS 变量 */
+	--font-sans: "Plus Jakarta Sans", "Segoe UI", -apple-system,
+		BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
+
+	--color-background: oklch(var(--background));
+	--color-foreground: oklch(var(--foreground));
+
+	--color-card: oklch(var(--card));
+	--color-card-foreground: oklch(var(--card-foreground));
+
+	--color-popover: oklch(var(--popover));
+	--color-popover-foreground: oklch(var(--popover-foreground));
+
+	--color-primary: oklch(var(--primary));
+	--color-primary-foreground: oklch(var(--primary-foreground));
+
+	--color-secondary: oklch(var(--secondary));
+	--color-secondary-foreground: oklch(var(--secondary-foreground));
+
+	--color-muted: oklch(var(--muted));
+	--color-muted-foreground: oklch(var(--muted-foreground));
+
+	--color-accent: oklch(var(--accent));
+	--color-accent-foreground: oklch(var(--accent-foreground));
+
+	--color-destructive: oklch(var(--destructive));
+
+	--color-border: oklch(var(--border));
+	--color-input: oklch(var(--input));
+	--color-ring: oklch(var(--ring));
+
+	--color-chart-1: oklch(var(--chart-1));
+	--color-chart-2: oklch(var(--chart-2));
+	--color-chart-3: oklch(var(--chart-3));
+	--color-chart-4: oklch(var(--chart-4));
+	--color-chart-5: oklch(var(--chart-5));
+
+	--color-sidebar: oklch(var(--sidebar));
+	--color-sidebar-foreground: oklch(var(--sidebar-foreground));
+	--color-sidebar-primary: oklch(var(--sidebar-primary));
+	--color-sidebar-primary-foreground: oklch(var(--sidebar-primary-foreground));
+	--color-sidebar-accent: oklch(var(--sidebar-accent));
+	--color-sidebar-accent-foreground: oklch(var(--sidebar-accent-foreground));
+	--color-sidebar-border: oklch(var(--sidebar-border));
+	--color-sidebar-ring: oklch(var(--sidebar-ring));
+
+	--color-overlay: oklch(var(--overlay));
+}
+
+@layer base {
+	:root,
+	:root[data-color-theme="catppuccin"] {
+		--radius: 0.625rem;
+		--background: 0.9577 0.0058 264.532;
+		--foreground: 0.4352 0.0432 279.504;
+		--card: 0.9577 0.0058 264.532;
+		--card-foreground: 0.4352 0.0432 279.504;
+		--popover: 0.9577 0.0058 264.532;
+		--popover-foreground: 0.4352 0.0432 279.504;
+		--primary: 0.5545 0.2503 296.969;
+		--primary-foreground: 0.9577 0.0058 264.532;
+		--primary-weak: 0.5545 0.2503 296.969 / 0.08;
+		--primary-weak-hover: 0.5545 0.2503 296.969 / 0.18;
+		--primary-border: 0.5545 0.2503 296.969;
+		--secondary: 0.8575 0.0145 268.666;
+		--secondary-foreground: 0.4352 0.0432 279.504;
+		--muted: 0.8575 0.0145 268.666;
+		--muted-foreground: 0.4923 0.0383 278.997;
+		--accent: 0.8575 0.0145 268.666;
+		--accent-foreground: 0.4352 0.0432 279.504;
+		--destructive: 0.5505 0.2155 19.735;
+		--border: 0.8083 0.0174 271.198;
+		--input: 0.8083 0.0174 271.198;
+		--ring: 0.4352 0.0432 279.504;
+		--chart-1: 0.7571 0.0941 3.250;
+		--chart-2: 0.8088 0.0536 203.148;
+		--chart-3: 0.7886 0.0908 262.510;
+		--chart-4: 0.8542 0.0650 75.981;
+		--chart-5: 0.8215 0.0746 141.799;
+		--sidebar: 0.9482 0.0075 261.511;
+		--sidebar-foreground: 0.4352 0.0432 279.504;
+		--sidebar-primary: 0.5545 0.2503 296.969;
+		--sidebar-primary-foreground: 0.9577 0.0058 264.532;
+		--sidebar-accent: 0.9577 0.0058 264.532;
+		--sidebar-accent-foreground: 0.4352 0.0432 279.504;
+		--sidebar-border: 0.8083 0.0174 271.198;
+		--sidebar-ring: 0.8083 0.0174 271.198;
+		--overlay: 0 0 0 / 0.72;
+	}
+
+
+
+
+
+	:root[data-color-theme="blue"] {
+		--radius: 1rem;
+		/* 说明：
+		 * 这里的 CSS 变量只保存 OKLCH 的参数（可选包含 / alpha），
+		 * 使用时统一写成 oklch(var(--xxx))，避免出现 oklch(oklch(...)) 导致样式失效。
+		 */
+		--background: 1 0 0;
+		--foreground: 0.141 0.005 285.823;
+		--card: 1 0 0;
+		--card-foreground: 0.141 0.005 285.823;
+		--popover: 1 0 0;
+		--popover-foreground: 0.141 0.005 285.823;
+		--primary: 0.488 0.243 264.376;
+		--primary-foreground: 0.9538 0.0149 277.85;
+		--primary-weak: 0.488 0.243 264.376 / 0.05;
+		--primary-weak-hover: 0.488 0.243 264.376 / 0.18;
+		--primary-border: 0.488 0.243 264.376;
+		--secondary: 0.967 0.001 286.375;
+		--secondary-foreground: 0.21 0.006 285.885;
+		--muted: 0.967 0.001 286.375;
+		--muted-foreground: 0.552 0.016 285.938;
+		--accent: 0.967 0.001 286.375;
+		--accent-foreground: 0.21 0.006 285.885;
+		--destructive: 0.577 0.245 27.325;
+		--border: 0.92 0.004 286.32;
+		--input: 0.92 0.004 286.32;
+		--ring: 0.708 0 0;
+		--chart-1: 0.809 0.105 251.813;
+		--chart-2: 0.623 0.214 259.815;
+		--chart-3: 0.546 0.245 262.881;
+		--chart-4: 0.488 0.243 264.376;
+		--chart-5: 0.424 0.199 265.638;
+		--sidebar: 0.985 0 0;
+		--sidebar-foreground: 0.141 0.005 285.823;
+		--sidebar-primary: 0.546 0.245 262.881;
+		--sidebar-primary-foreground: 0.97 0.014 254.604;
+		--sidebar-accent: 0.967 0.001 286.375;
+		--sidebar-accent-foreground: 0.21 0.006 285.885;
+		--sidebar-border: 0.92 0.004 286.32;
+		--sidebar-ring: 0.708 0 0;
+		--overlay: 0 0 0 / 0.72;
+	}
+
+	:root[data-color-theme="neutral"] {
+		--radius: 0.65rem;
+		--background: 1 0 0;
+		--foreground: 0.145 0 0;
+		--card: 1 0 0;
+		--card-foreground: 0.145 0 0;
+		--popover: 1 0 0;
+		--popover-foreground: 0.145 0 0;
+		--primary: 0.205 0 0;
+		--primary-foreground: 0.985 0 0;
+		--primary-weak: 0.205 0 0 / 0.08;
+		--primary-weak-hover: 0.205 0 0 / 0.12;
+		--primary-border: 0.205 0 0;
+		--secondary: 0.97 0 0;
+		--secondary-foreground: 0.205 0 0;
+		--muted: 0.97 0 0;
+		--muted-foreground: 0.556 0 0;
+		--accent: 0.97 0 0;
+		--accent-foreground: 0.205 0 0;
+		--destructive: 0.577 0.245 27.325;
+		--border: 0.922 0 0;
+		--input: 0.922 0 0;
+		--ring: 0.708 0 0;
+		--chart-1: 0.646 0.222 41.116;
+		--chart-2: 0.6 0.118 184.704;
+		--chart-3: 0.398 0.07 227.392;
+		--chart-4: 0.828 0.189 84.429;
+		--chart-5: 0.769 0.188 70.08;
+		--sidebar: 0.985 0 0;
+		--sidebar-foreground: 0.145 0 0;
+		--sidebar-primary: 0.205 0 0;
+		--sidebar-primary-foreground: 0.985 0 0;
+		--sidebar-accent: 0.97 0 0;
+		--sidebar-accent-foreground: 0.205 0 0;
+		--sidebar-border: 0.922 0 0;
+		--sidebar-ring: 0.708 0 0;
+		--overlay: 0 0 0 / 0.72;
+	}
+
+
+
+
+	.dark,
+	.dark[data-color-theme="catppuccin"] {
+		--background: 0.2429 0.0304 283.911;
+		--foreground: 0.8787 0.0426 272.277;
+		--card: 0.324 0.0319 281.978;
+		--card-foreground: 0.8787 0.0426 272.277;
+		--popover: 0.324 0.0319 281.978;
+		--popover-foreground: 0.8787 0.0426 272.277;
+		--primary: 0.7871 0.1187 304.769;
+		--primary-foreground: 0.2429 0.0304 283.911;
+		--primary-weak: 0.7871 0.1187 304.769 / 0.16;
+		--primary-weak-hover: 0.7871 0.1187 304.769 / 0.3;
+		--primary-border: 0.7871 0.1187 304.769;
+		--secondary: 0.4037 0.032 280.152;
+		--secondary-foreground: 0.8787 0.0426 272.277;
+		--muted: 0.4765 0.034 278.643;
+		--muted-foreground: 0.8168 0.0403 272.862;
+		--accent: 0.4037 0.032 280.152;
+		--accent-foreground: 0.8787 0.0426 272.277;
+		--destructive: 0.704 0.191 22.216;
+		--border: 0.4037 0.032 280.152;
+		--input: 0.4037 0.032 280.152;
+		--ring: 0.7871 0.1187 304.769;
+		--chart-1: 0.7871 0.1187 304.769;
+		--chart-2: 0.7664 0.1113 259.885;
+		--chart-3: 0.8577 0.1092 142.715;
+		--chart-4: 0.8237 0.1015 52.629;
+		--chart-5: 0.9193 0.0704 86.528;
+		--sidebar: 0.2155 0.0254 284.065;
+		--sidebar-foreground: 0.8787 0.0426 272.277;
+		--sidebar-primary: 0.7871 0.1187 304.769;
+		--sidebar-primary-foreground: 0.2429 0.0304 283.911;
+		--sidebar-accent: 0.324 0.0319 281.978;
+		--sidebar-accent-foreground: 0.8787 0.0426 272.277;
+		--sidebar-border: 0.4037 0.032 280.152;
+		--sidebar-ring: 0.7871 0.1187 304.769;
+		--overlay: 0 0 0 / 0.72;
+	}
+
+
+
+
+
+	.dark[data-color-theme="blue"] {
+		--background: 0.2667 0.011 254.03;
+		--foreground: 0.985 0 0;
+		--card: 0.21 0.006 285.885;
+		--card-foreground: 0.985 0 0;
+		--popover: 0.21 0.006 285.885;
+		--popover-foreground: 0.985 0 0;
+		--primary: 0.788 0.243 264.376;
+		--primary-foreground: 0.97 0.014 254.604;
+		--primary-weak: 0.788 0.243 264.376 / 0.1;
+		--primary-weak-hover: 0.788 0.243 264.376 / 0.28;
+		--primary-border: 0.788 0.243 264.376;
+		--secondary: 0.274 0.006 286.033;
+		--secondary-foreground: 0.985 0 0;
+		--muted: 0.274 0.006 286.033;
+		--muted-foreground: 0.705 0.015 286.067;
+		--accent: 0.3408 0.0054 271.26;
+		--accent-foreground: 0.985 0 0;
+		--destructive: 0.704 0.191 22.216;
+		--border: 1 0 0 / 10%;
+		--input: 1 0 0 / 15%;
+		--ring: 0.556 0 0;
+		--chart-1: 0.809 0.105 251.813;
+		--chart-2: 0.623 0.214 259.815;
+		--chart-3: 0.546 0.245 262.881;
+		--chart-4: 0.688 0.243 264.376;
+		--chart-5: 0.424 0.199 265.638;
+		--sidebar: 0.21 0.006 285.885;
+		--sidebar-foreground: 0.985 0 0;
+		--sidebar-primary: 0.623 0.214 259.815;
+		--sidebar-primary-foreground: 0.97 0.014 254.604;
+		--sidebar-accent: 0.274 0.006 286.033;
+		--sidebar-accent-foreground: 0.985 0 0;
+		--sidebar-border: 1 0 0 / 10%;
+		--sidebar-ring: 0.439 0 0;
+		--overlay: 0 0 0 / 0.72;
+	}
+
+	.dark[data-color-theme="neutral"] {
+		--background: 0.145 0 0;
+		--foreground: 0.985 0 0;
+		--card: 0.205 0 0;
+		--card-foreground: 0.985 0 0;
+		--popover: 0.205 0 0;
+		--popover-foreground: 0.985 0 0;
+		--primary: 0.922 0 0;
+		--primary-foreground: 0.205 0 0;
+		--primary-weak: 0.922 0 0 / 0.1;
+		--primary-weak-hover: 0.922 0 0 / 0.14;
+		--primary-border: 0.922 0 0;
+		--secondary: 0.269 0 0;
+		--secondary-foreground: 0.985 0 0;
+		--muted: 0.269 0 0;
+		--muted-foreground: 0.708 0 0;
+		--accent: 0.269 0 0;
+		--accent-foreground: 0.985 0 0;
+		--destructive: 0.704 0.191 22.216;
+		--border: 1 0 0 / 10%;
+		--input: 1 0 0 / 15%;
+		--ring: 0.556 0 0;
+		--chart-1: 0.488 0.243 264.376;
+		--chart-2: 0.696 0.17 162.48;
+		--chart-3: 0.769 0.188 70.08;
+		--chart-4: 0.627 0.265 303.9;
+		--chart-5: 0.645 0.246 16.439;
+		--sidebar: 0.205 0 0;
+		--sidebar-foreground: 0.985 0 0;
+		--sidebar-primary: 0.488 0.243 264.376;
+		--sidebar-primary-foreground: 0.985 0 0;
+		--sidebar-accent: 0.269 0 0;
+		--sidebar-accent-foreground: 0.985 0 0;
+		--sidebar-border: 1 0 0 / 10%;
+		--sidebar-ring: 0.556 0 0;
+		--overlay: 0 0 0 / 0.72;
+	}
+
+
+
+	* {
+		border-color: oklch(var(--border));
+		/* 滚动条轨道和滑块的基础样式 */
+		scrollbar-width: thin; /* Firefox: 使用细滚动条 */
+		scrollbar-color: transparent transparent; /* Firefox: 默认透明 */
+	}
+
+	body {
+		background-color: oklch(var(--background));
+		color: oklch(var(--foreground));
+		font-family: var(--font-sans);
+		font-weight: 500;
+	}
+
+	:root[data-color-theme="catppuccin"] body {
+		font-weight: 600;
+	}
+
+	/* Webkit 浏览器 (Chrome, Safari, Edge) 滚动条样式 */
+	*::-webkit-scrollbar {
+		width: 6px; /* 滚动条宽度减半（默认约12px） */
+		height: 6px; /* 水平滚动条高度 */
+	}
+
+	*::-webkit-scrollbar-track {
+		background: transparent; /* 轨道透明 */
+	}
+
+	/* 滚动条样式：简洁版本（无动画，浏览器不支持滚动条伪元素的过渡动画） */
+	*::-webkit-scrollbar-thumb {
+		background: transparent;
+		border-radius: 3px;
+	}
+
+	/* 移除滚动条按钮（上下箭头） */
+	*::-webkit-scrollbar-button {
+		display: none;
+		width: 0;
+		height: 0;
+	}
+
+	/* 默认状态：滚动条透明 */
+	[data-panel] *::-webkit-scrollbar-thumb {
+		background: transparent;
+	}
+
+	/* 当 panel 有 scrollbar-visible 类时：滚动条显示 */
+	[data-panel].scrollbar-visible *::-webkit-scrollbar-thumb {
+		background: rgba(128, 128, 128, 0.25);
+	}
+
+	/* hover 时增加颜色强度 */
+	[data-panel].scrollbar-visible *::-webkit-scrollbar-thumb:hover {
+		background: rgba(128, 128, 128, 0.4);
+	}
+
+	/* Firefox 滚动条显示控制 */
+	/* 注意：Firefox 的 scrollbar-color 不支持透明度语法，使用 border 颜色 */
+	[data-panel="panelA"].scrollbar-visible *,
+	[data-panel="panelB"].scrollbar-visible *,
+	[data-panel="panelC"].scrollbar-visible * {
+		scrollbar-color: oklch(var(--border)) transparent;
+	}
+
+	/* Text-shaped shimmer loading */
+	.shimmer-text {
+		@apply bg-clip-text text-transparent;
+		background-image: linear-gradient(
+			90deg,
+			rgba(148, 163, 184, 0.2),
+			rgba(148, 163, 184, 0.9),
+			rgba(148, 163, 184, 0.2)
+		);
+		background-size: 200% 100%;
+		animation: shimmer-text-move 1.5s linear infinite;
+	}
+
+	@keyframes shimmer-text-move {
+		0% {
+			background-position: 200% 0;
+		}
+		100% {
+			background-position: -200% 0;
+		}
+	}
+}
+
+/* Driver.js custom styles for onboarding tour
+   Using high specificity selectors (html body) to override library defaults */
+html body .driver-popover {
+	background-color: oklch(var(--card));
+	color: oklch(var(--card-foreground));
+	border: 1px solid oklch(var(--border));
+	border-radius: var(--radius);
+	box-shadow: 0 10px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+}
+
+html body .driver-popover-title {
+	font-size: 1.125rem;
+	font-weight: 600;
+	color: oklch(var(--foreground));
+}
+
+html body .driver-popover-description {
+	color: oklch(var(--muted-foreground));
+	line-height: 1.6;
+}
+
+html body .driver-popover-progress-text {
+	color: oklch(var(--muted-foreground));
+	font-size: 0.75rem;
+}
+
+html body .driver-popover-prev-btn,
+html body .driver-popover-next-btn {
+	background-color: oklch(var(--primary));
+	color: oklch(var(--primary-foreground));
+	border: none;
+	border-radius: calc(var(--radius) - 4px);
+	padding: 0.5rem 1rem;
+	font-weight: 500;
+	transition: all 0.2s ease;
+	text-shadow: none;
+}
+
+html body .driver-popover-prev-btn:hover {
+	background-color: oklch(var(--secondary));
+	color: oklch(var(--primary-weak-hover-foreground));
+	box-shadow: 0 4px 16px -2px oklch(var(--secondary)),
+		0 2px 8px -1px oklch(var(--secondary)),
+		inset 0 1px 0 0 oklch(var(--secondary));
+	transform: translateY(-1px) scale(1.02);
+}
+
+html body .driver-popover-next-btn:hover {
+	background-color: oklch(var(--primary));
+	color: oklch(var(--primary-foreground));
+	box-shadow: 0 4px 16px -2px oklch(var(--primary) / 0.5),
+		0 2px 8px -1px oklch(var(--primary) / 0.3),
+		inset 0 1px 0 0 oklch(var(--primary-foreground) / 0.1);
+	transform: translateY(-1px) scale(1.02);
+}
+
+html body .driver-popover-prev-btn {
+	background-color: oklch(var(--secondary));
+	color: oklch(var(--secondary-foreground));
+}
+
+html body .driver-popover-close-btn {
+	color: oklch(var(--muted-foreground));
+}
+
+html body .driver-popover-close-btn:hover {
+	color: oklch(var(--foreground));
+}
+
+/* Dark mode specific adjustments */
+html body.dark .driver-popover {
+	box-shadow: 0 10px 25px -5px rgb(0 0 0 / 0.3), 0 8px 10px -6px rgb(0 0 0 / 0.3);
+}

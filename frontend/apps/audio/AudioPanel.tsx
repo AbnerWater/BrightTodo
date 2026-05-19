@@ -1,0 +1,383 @@
+"use client";
+
+import { useTranslations } from "next-intl";
+import { useCallback, useMemo, useRef, useState } from "react";
+import { PanelHeader } from "@/components/common/layout/PanelHeader";
+import { FEATURE_ICON_MAP } from "@/lib/config/panel-config";
+import { useAudioRecordingStore } from "@/lib/store/audio-recording-store";
+import { toastError } from "@/lib/toast";
+import { AudioExtractionPanel } from "./components/AudioExtractionPanel";
+import { AudioHeader } from "./components/AudioHeader";
+import { AudioPlayer } from "./components/AudioPlayer";
+import { RecordingStatus } from "./components/RecordingStatus";
+import { StopRecordingConfirm } from "./components/StopRecordingConfirm";
+import { TranscriptionView } from "./components/TranscriptionView";
+import { useAudioData } from "./hooks/useAudioData";
+import { useAudioDateSwitching } from "./hooks/useAudioDateSwitching";
+import { useAudioPlayback } from "./hooks/useAudioPlayback";
+import { useAudioRecording } from "./hooks/useAudioRecording";
+import { useSegmentSync } from "./hooks/useSegmentSync";
+import { useStopRecordingConfirm } from "./hooks/useStopRecordingConfirm";
+import { parseTimeToIsoWithDate as parseTimeToIsoWithDateUtil } from "./utils/parseTimeToIsoWithDate";
+import { formatDateTime, formatTime, getSegmentDate } from "./utils/timeUtils";
+
+export function AudioPanel() {
+	const t = useTranslations("page");
+	const [activeTab, setActiveTab] = useState<"original" | "optimized">("original");
+	const [selectedDate, setSelectedDate] = useState(new Date());
+
+	// 获取录音状态和控制函数（从全局 store）
+	const { isRecording, startRecording, stopRecording } = useAudioRecording();
+
+	// 从全局 store 获取实时录音数据（用于面板切换时保持状态）
+	const storeTranscriptionText = useAudioRecordingStore((state) => state.transcriptionText);
+	const storePartialText = useAudioRecordingStore((state) => state.partialText);
+	const storeOptimizedText = useAudioRecordingStore((state) => state.optimizedText);
+	const storeSegmentTimesSec = useAudioRecordingStore((state) => state.segmentTimesSec);
+	const storeSegmentTimeLabels = useAudioRecordingStore((state) => state.segmentTimeLabels);
+	const storeSegmentRecordingIds = useAudioRecordingStore((state) => state.segmentRecordingIds);
+	const storeSegmentOffsetsSec = useAudioRecordingStore((state) => state.segmentOffsetsSec);
+	const storeLiveTodos = useAudioRecordingStore((state) => state.liveTodos);
+	const storeLiveSchedules = useAudioRecordingStore((state) => state.liveSchedules);
+	const storeRecordingStartedAt = useAudioRecordingStore((state) => state.recordingStartedAt);
+
+	// 从全局 store 获取更新方法
+	const updateLastFinalEnd = useAudioRecordingStore((state) => state.updateLastFinalEnd);
+	const appendTranscriptionText = useAudioRecordingStore((state) => state.appendTranscriptionText);
+	const setStorePartialText = useAudioRecordingStore((state) => state.setPartialText);
+	const setStoreOptimizedText = useAudioRecordingStore((state) => state.setOptimizedText);
+	const appendSegmentData = useAudioRecordingStore((state) => state.appendSegmentData);
+	const setStoreLiveTodos = useAudioRecordingStore((state) => state.setLiveTodos);
+	const setStoreLiveSchedules = useAudioRecordingStore((state) => state.setLiveSchedules);
+	const clearSessionData = useAudioRecordingStore((state) => state.clearSessionData);
+
+	// 本地状态：用于回看模式（从后端加载的历史数据）
+	const [localTranscriptionText, setLocalTranscriptionText] = useState("");
+	const [localOptimizedText, setLocalOptimizedText] = useState("");
+
+	// 根据录音状态选择数据源：录音中使用 store 数据，回看使用本地数据
+	const transcriptionText = isRecording ? storeTranscriptionText : localTranscriptionText;
+	const partialText = isRecording ? storePartialText : "";
+	const optimizedText = isRecording ? storeOptimizedText : localOptimizedText;
+
+	const {
+		selectedRecordingId,
+		setSelectedRecordingId,
+		selectedRecordingDurationSec,
+		setSelectedRecordingDurationSec,
+		recordingDurations,
+		segmentOffsetsSec: dataSegmentOffsetsSec,
+		setSegmentOffsetsSec: setDataSegmentOffsetsSec,
+		segmentRecordingIds: dataSegmentRecordingIds,
+		setSegmentRecordingIds: setDataSegmentRecordingIds,
+		segmentTimeLabels: dataSegmentTimeLabels,
+		setSegmentTimeLabels: setDataSegmentTimeLabels,
+		segmentTimesSec: dataSegmentTimesSec,
+		setSegmentTimesSec: setDataSegmentTimesSec,
+		extractionsByRecordingId,
+		optimizedExtractionsByRecordingId,
+		setOptimizedExtractionsByRecordingId,
+		loadRecordings,
+		loadTimeline,
+	} = useAudioData(selectedDate, activeTab, setLocalTranscriptionText, setLocalOptimizedText);
+
+	// 根据录音状态选择段落数据源
+	const segmentTimesSec = isRecording ? storeSegmentTimesSec : dataSegmentTimesSec;
+	const segmentTimeLabels = isRecording ? storeSegmentTimeLabels : dataSegmentTimeLabels;
+	const segmentRecordingIds = isRecording ? storeSegmentRecordingIds : dataSegmentRecordingIds;
+	const segmentOffsetsSec = isRecording ? storeSegmentOffsetsSec : dataSegmentOffsetsSec;
+	const liveTodos = isRecording ? storeLiveTodos : [];
+	const liveSchedules = isRecording ? storeLiveSchedules : [];
+
+	// 停止录音确认弹窗和后续轮询逻辑
+	const {
+		showStopConfirm,
+		isExtracting,
+		isLoadingTimeline,
+		setIsLoadingTimeline,
+		openStopConfirm,
+		cancelStopConfirm,
+		confirmStop,
+	} = useStopRecordingConfirm({ selectedDate, stopRecording, loadRecordings, loadTimeline });
+
+	const {
+		audioRef, isPlaying, currentTime, duration, playbackRate,
+		ensureAudio, playPause, seekByRatio, setPlaybackRate,
+	} = useAudioPlayback();
+
+	// 段落选择同步
+	const { selectedSegmentIndex, setSelectedSegmentIndex, currentSegmentText } = useSegmentSync({
+		isRecording, selectedRecordingId, currentTime, segmentRecordingIds,
+		segmentOffsetsSec, activeTab, transcriptionText, optimizedText,
+	});
+
+	// 辅助函数：获取本地日期字符串（用于日期比较）
+	const getLocalDateStringForCompare = useCallback((date: Date) => {
+		const year = date.getFullYear();
+		const month = String(date.getMonth() + 1).padStart(2, "0");
+		const day = String(date.getDate()).padStart(2, "0");
+		return `${year}-${month}-${day}`;
+	}, []);
+
+	// 用于存储实时录音的完整状态（持久化，不被清空）
+	const liveRecordingStateRef = useRef<{
+		text: string;
+		optimizedText: string;
+		partialText: string;
+		segmentTimesSec: number[];
+		segmentOffsetsSec: number[];
+		segmentRecordingIds: number[];
+		segmentTimeLabels: string[];
+		todos: Array<{ title: string; description?: string; deadline?: string; source_text?: string }>;
+		schedules: Array<{ title: string; time?: string; description?: string; source_text?: string }>;
+	}>({
+		text: "",
+		optimizedText: "",
+		partialText: "",
+		segmentTimesSec: [],
+		segmentOffsetsSec: [],
+		segmentRecordingIds: [],
+		segmentTimeLabels: [],
+		todos: [],
+		schedules: [],
+	});
+
+	// 用于手动启动录音的 ref（防止重复启动）
+	const isStartingRef = useRef(false);
+
+	// 计算是否正在查看当前日期
+	const isViewingCurrentDate = useMemo(() => {
+		const now = new Date();
+		return getLocalDateStringForCompare(selectedDate) === getLocalDateStringForCompare(now);
+	}, [selectedDate, getLocalDateStringForCompare]);
+
+	// 跳转到当前日期
+	const handleJumpToCurrentDate = useCallback(() => setSelectedDate(new Date()), []);
+
+	// 手动开始录音
+	const handleStartRecording = useCallback(async () => {
+		if (isRecording || isStartingRef.current) return;
+		isStartingRef.current = true;
+		try {
+			clearSessionData();
+			setSelectedSegmentIndex(null);
+			await startRecording(
+				(text, isFinal) => {
+					if (isFinal && text.startsWith("__SEGMENT_SAVED__")) return;
+					if (isFinal) {
+						const storeState = useAudioRecordingStore.getState();
+						const currentRecordingStartedAt = storeState.recordingStartedAt ?? Date.now();
+						const segmentStartMs = storeState.lastFinalEndMs ?? currentRecordingStartedAt;
+						const elapsedSec = (segmentStartMs - currentRecordingStartedAt) / 1000;
+						updateLastFinalEnd(Date.now());
+						appendTranscriptionText(text);
+						const start = storeState.recordingStartedDate ?? new Date();
+						const segmentDate = getSegmentDate(start, elapsedSec, selectedDate);
+						appendSegmentData({
+							timeSec: elapsedSec,
+							timeLabel: formatDateTime(segmentDate),
+							recordingId: 0,
+							offsetSec: elapsedSec,
+						});
+						setStorePartialText("");
+					} else {
+						setStorePartialText(text);
+					}
+				},
+				(data) => {
+					if (typeof data.optimizedText === "string") setStoreOptimizedText(data.optimizedText);
+					if (Array.isArray(data.todos)) setStoreLiveTodos(data.todos);
+					if (Array.isArray(data.schedules)) setStoreLiveSchedules(data.schedules);
+				},
+				(error) => {
+					const errorMessage = error instanceof Error ? error.message : "录音过程中发生错误";
+					toastError(errorMessage, { duration: 5000 });
+				},
+				true
+			);
+		} catch (error) {
+			const errorMessage = error instanceof Error ? error.message : "启动录音失败";
+			toastError(errorMessage, { duration: 5000 });
+		} finally {
+			isStartingRef.current = false;
+		}
+	}, [
+		isRecording, clearSessionData, startRecording, updateLastFinalEnd,
+		appendTranscriptionText, appendSegmentData, setStorePartialText,
+		setStoreOptimizedText, setStoreLiveTodos, setStoreLiveSchedules, selectedDate, setSelectedSegmentIndex,
+	]);
+
+	// 手动停止录音（显示确认弹窗）
+	const handleStopRecording = useCallback(() => {
+		if (!isRecording) return;
+		openStopConfirm();
+	}, [isRecording, openStopConfirm]);
+
+	// 用于防止数据加载错乱：记录当前加载请求的日期
+	const currentLoadingDateRef = useRef<string | null>(null);
+
+	// 创建适配器函数，让 useAudioDateSwitching 能够操作本地状态（用于回看模式）
+	const setTranscriptionTextAdapter = useCallback((text: string | ((prev: string) => string)) => {
+		if (typeof text === "function") {
+			setLocalTranscriptionText((prev) => text(prev));
+		} else {
+			setLocalTranscriptionText(text);
+		}
+	}, []);
+
+	const setOptimizedTextAdapter = useCallback((text: string | ((prev: string) => string)) => {
+		if (typeof text === "function") {
+			setLocalOptimizedText((prev) => text(prev));
+		} else {
+			setLocalOptimizedText(text);
+		}
+	}, []);
+
+	// 使用日期切换 hook（操作本地状态用于回看模式）
+	useAudioDateSwitching({
+		selectedDate, isRecording, isViewingCurrentDate, liveRecordingStateRef, currentLoadingDateRef,
+		setTranscriptionText: setTranscriptionTextAdapter, setOptimizedText: setOptimizedTextAdapter,
+		setPartialText: setStorePartialText, setSegmentTimesSec: setDataSegmentTimesSec,
+		setSegmentOffsetsSec: setDataSegmentOffsetsSec, setSegmentRecordingIds: setDataSegmentRecordingIds,
+		setSegmentTimeLabels: setDataSegmentTimeLabels, setLiveTodos: setStoreLiveTodos,
+		setLiveSchedules: setStoreLiveSchedules, setIsLoadingTimeline, loadTimeline,
+	});
+
+	const formatDate = (date: Date) => `${date.toLocaleDateString("zh-CN", {
+		year: "numeric", month: "long", day: "numeric",
+	})} 录音`;
+
+	const Icon = FEATURE_ICON_MAP.audio;
+	const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8100";
+
+	const handlePlayFromTranscription = useCallback(() => {
+		if (!selectedRecordingId) return;
+		playPause(`${apiBaseUrl}/api/audio/recording/${selectedRecordingId}/file`);
+	}, [apiBaseUrl, selectedRecordingId, playPause]);
+
+	const handleSeekToSegment = useCallback((index: number) => {
+		const recId = segmentRecordingIds[index] ?? selectedRecordingId;
+		if (!recId) return;
+		const audioUrl = `${apiBaseUrl}/api/audio/recording/${recId}/file`;
+		ensureAudio(audioUrl);
+		const audio = audioRef.current;
+		if (!audio) return;
+
+		const direct = segmentOffsetsSec[index];
+		const segmentsCount = Math.max(1, segmentOffsetsSec.length);
+		const dur = recordingDurations[recId] ?? selectedRecordingDurationSec;
+		const fallback = dur > 0 ? (index / segmentsCount) * dur : 0;
+		const target = (Number.isFinite(direct) ? direct : fallback) + 1;
+
+		try {
+			audio.currentTime = Math.max(0, target);
+			audio.play().catch(() => {});
+			setSelectedRecordingId(recId);
+			setSelectedSegmentIndex(index);
+			if (dur) setSelectedRecordingDurationSec(dur);
+		} catch (e) {
+			console.error("Failed to seek audio:", e);
+		}
+	}, [
+		apiBaseUrl, ensureAudio, selectedRecordingId, segmentRecordingIds, segmentOffsetsSec,
+		selectedRecordingDurationSec, recordingDurations, audioRef, setSelectedRecordingId, setSelectedRecordingDurationSec, setSelectedSegmentIndex,
+	]);
+
+	const handlePlayPause = useCallback(() => {
+		if (!audioRef.current) handlePlayFromTranscription();
+		else playPause();
+	}, [handlePlayFromTranscription, playPause, audioRef]);
+
+	const handleSeekInPlayer = useCallback((ratio: number) => seekByRatio(ratio), [seekByRatio]);
+
+	// 每一条文本段对应的高亮数据
+	const segmentTodos = useMemo(() => segmentRecordingIds.map((recId) => {
+		if (recId === 0) return liveTodos;
+		const ext = recId != null ? extractionsByRecordingId[recId] : undefined;
+		return ext?.todos ?? [];
+	}), [segmentRecordingIds, liveTodos, extractionsByRecordingId]);
+
+	const segmentSchedules = useMemo(() => segmentRecordingIds.map((recId) => {
+		if (recId === 0) return liveSchedules;
+		const ext = recId != null ? extractionsByRecordingId[recId] : undefined;
+		return ext?.schedules ?? [];
+	}), [segmentRecordingIds, liveSchedules, extractionsByRecordingId]);
+
+	const dateKey = useMemo(() => selectedDate.toISOString().split("T")[0], [selectedDate]);
+	const parseTimeToIsoWithDate = useCallback(
+		(raw?: string | null) => parseTimeToIsoWithDateUtil(raw, selectedDate),
+		[selectedDate],
+	);
+
+	return (
+		<div className="flex h-full flex-col bg-[oklch(var(--background))] overflow-hidden">
+			<PanelHeader icon={Icon} title={t("audioLabel")} />
+
+			<AudioHeader
+				isRecording={isRecording}
+				selectedDate={selectedDate}
+				onDateChange={setSelectedDate}
+				onJumpToCurrentDate={handleJumpToCurrentDate}
+				onStartRecording={handleStartRecording}
+				onStopRecording={handleStopRecording}
+			/>
+
+			<AudioExtractionPanel
+				dateKey={dateKey}
+				segmentRecordingIds={segmentRecordingIds}
+				extractionsByRecordingId={optimizedExtractionsByRecordingId}
+				setExtractionsByRecordingId={setOptimizedExtractionsByRecordingId}
+				parseTimeToIsoWithDate={parseTimeToIsoWithDate}
+				liveTodos={liveTodos}
+				liveSchedules={liveSchedules}
+				isRecording={isRecording}
+				isExtracting={isExtracting}
+			/>
+
+			<TranscriptionView
+				originalText={transcriptionText}
+				partialText={isRecording && isViewingCurrentDate ? partialText : ""}
+				optimizedText={optimizedText}
+				activeTab={activeTab}
+				onTabChange={(tab) => {
+					setActiveTab(tab);
+					setIsLoadingTimeline(true);
+					loadTimeline((loading) => setIsLoadingTimeline(loading), false);
+				}}
+				segmentTodos={segmentTodos}
+				segmentSchedules={segmentSchedules}
+				isRecording={isRecording && isViewingCurrentDate}
+				segmentTimesSec={segmentTimesSec}
+				segmentTimeLabels={segmentTimeLabels}
+				selectedSegmentIndex={selectedSegmentIndex}
+				onSegmentClick={(index) => {
+					const recordingId = segmentRecordingIds[index];
+					if (recordingId && recordingId > 0) handleSeekToSegment(index);
+				}}
+				isLoadingTimeline={isLoadingTimeline}
+			/>
+
+			{isRecording && isViewingCurrentDate ? (
+				<RecordingStatus isRecording={isRecording} recordingStartedAt={storeRecordingStartedAt || undefined} />
+			) : (
+				selectedRecordingId && (
+					<AudioPlayer
+						title={formatDate(selectedDate)}
+						date=""
+						currentTime={formatTime(currentTime)}
+						totalTime={formatTime(duration)}
+						isPlaying={isPlaying}
+						onPlay={handlePlayPause}
+						progress={duration > 0 ? currentTime / duration : 0}
+						onSeek={handleSeekInPlayer}
+						currentSegmentText={currentSegmentText}
+						playbackRate={playbackRate}
+						onPlaybackRateChange={setPlaybackRate}
+					/>
+				)
+			)}
+
+			<StopRecordingConfirm isOpen={showStopConfirm} onCancel={cancelStopConfirm} onConfirm={confirmStop} />
+		</div>
+	);
+}

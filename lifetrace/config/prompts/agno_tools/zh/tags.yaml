@@ -1,0 +1,43 @@
+# 标签管理工具消息 - 中文版
+
+# 标签列表
+tags_header: "所有标签 (共 {count} 个):\n"
+tags_item: "- {tag} ({count} 个待办)"
+tags_empty: "暂无标签"
+
+# 按标签查询
+todos_by_tag_header: "标签 \"{tag}\" 下的待办 (共 {count} 项):\n"
+todos_by_tag_item: "- #{id} [{status}] {name}"
+todos_by_tag_empty: "标签 \"{tag}\" 下没有待办"
+
+# 标签推荐指导（用于 Agent 直接推荐，避免嵌套 LLM 调用）
+suggest_tags_guide: |
+  请根据以下待办名称，推荐 3-5 个合适的标签。
+
+  **待办名称：** {todo_name}
+
+  **已有标签（供参考，可复用或创建新标签）：** {existing_tags}
+
+  **推荐要求：**
+  1. 推荐 3-5 个相关标签
+  2. 优先考虑复用已有标签
+  3. 如果已有标签不合适，可以创建新标签
+  4. 标签应该简洁、有意义、便于分类
+
+  请直接推荐标签并展示结果，无需调用其他工具。格式：推荐标签: 标签1, 标签2, 标签3
+
+# 保留旧的消息键以兼容性（已废弃，但保留以防引用）
+suggest_tags_prompt: |
+  根据以下待办名称，推荐 3-5 个合适的标签。
+
+  **待办名称：** {todo_name}
+
+  **已有标签（供参考）：** {existing_tags}
+
+  请返回 JSON 格式：
+  ```json
+  {{"suggested_tags": ["标签1", "标签2", "标签3"]}}
+  ```
+
+suggest_tags_result: "推荐标签: {tags}"
+suggest_tags_failed: "标签推荐失败: {error}"

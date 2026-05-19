@@ -1,0 +1,5 @@
+Alembic 数据库迁移目录
+
+此目录包含 Alembic 数据库迁移脚本。
+
+常用命令请见: [MIGRATIONS.md](MIGRATIONS.md)

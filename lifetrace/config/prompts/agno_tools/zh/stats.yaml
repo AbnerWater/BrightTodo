@@ -1,0 +1,15 @@
+# 统计分析工具消息 - 中文版
+
+# 统计
+stats_header: "待办统计 ({date_range}):\n"
+stats_total: "- 总数: {total}"
+stats_completed: "- 已完成: {completed}"
+stats_active: "- 进行中: {active}"
+stats_overdue: "- 已逾期: {overdue}"
+stats_by_priority: "- 按优先级: 高({high}) 中({medium}) 低({low}) 无({none})"
+stats_failed: "获取统计失败: {error}"
+
+# 逾期
+overdue_header: "逾期待办 (共 {count} 项):\n"
+overdue_item: "- #{id} {name} (逾期 {days} 天)"
+no_overdue: "没有逾期的待办事项"

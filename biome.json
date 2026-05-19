@@ -1,0 +1,22 @@
+{
+	"$schema": "https://biomejs.dev/schemas/2.3.13/schema.json",
+	"files": {
+		"includes": ["**", "!free-todo-frontend/lib/generated/**"]
+	},
+	"linter": {
+		"enabled": true,
+		"rules": {
+			"a11y": {
+				"useSemanticElements": "off"
+			}
+		}
+	},
+	"formatter": {
+		"enabled": false
+	},
+	"css": {
+		"parser": {
+			"tailwindDirectives": true
+		}
+	}
+}

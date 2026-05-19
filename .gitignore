@@ -1,0 +1,84 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+# lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual Environment
+venv/
+.venv/
+ENV/
+env/
+
+# Claude Code
+.claude/settings.local.json
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# LifeTrace specific
+lifetrace/data/
+lifetrace/config/config.yaml
+
+# Frontend - Node.js cache and build artifacts
+**/node_modules/
+**/.next/
+**/out/
+**/.env.local
+**/.env.production
+**/.vercel
+**/dist-electron*/
+**/dist-electron-app*/
+**/dist/
+**/dist-backend*/
+**/dist-backend-app*/
+**/.pnpm-store/
+**/.yarn/
+**/.pnp.*
+**/.cache/
+**/tsconfig.tsbuildinfo
+
+# Temporary files
+*.log
+*.tmp
+.cache/
+.ruff_cache/
+
+# Build
+dist-backend/
+
+# Rust / Tauri
+**/target/
+**/target-clippy*/
+**/*.rs.bk
+**/Cargo.lock
+**/WixTools/
+**/gen/
+
+docs/
+skills/
+.claude/

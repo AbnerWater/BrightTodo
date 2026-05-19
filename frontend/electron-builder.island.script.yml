@@ -1,0 +1,88 @@
+appId: com.freeugroup.freetodo.island
+productName: FreeTodo Island
+copyright: Copyright © 2026 FreeU Group
+
+directories:
+  output: dist-artifacts/electron/island/script
+  buildResources: build
+
+files:
+  - 'dist-electron/**/*'
+
+extraResources:
+  - from: '.next/standalone'
+    to: 'standalone'
+    filter:
+      - '**/*'
+      - '!**/.pnpm/**'
+  - from: '.next/standalone/node_modules'
+    to: 'standalone/node_modules'
+    filter:
+      - '**/*'
+  - from: '.next/static'
+    to: 'standalone/.next/static'
+    filter:
+      - '**/*'
+  - from: 'public'
+    to: 'standalone/public'
+    filter:
+      - '**/*'
+  - from: '../lifetrace'
+    to: 'backend/lifetrace'
+    filter:
+      - '**/*'
+      - '!**/__pycache__/**'
+      - '!**/*.pyc'
+      - '!**/data/**'
+      - '!**/config/config.yaml'
+      - '!**/.venv/**'
+      - '!**/.ruff_cache/**'
+  - from: '../requirements-runtime.txt'
+    to: 'backend/requirements-runtime.txt'
+
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+  icon: public/favicon.ico
+  artifactName: '${productName}-${version}-script-win-${arch}.${ext}'
+
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  deleteAppDataOnUninstall: false
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  include: build/installer.nsh
+
+mac:
+  target:
+    - target: dmg
+      arch:
+        - x64
+        - arm64
+  icon: public/logo.png
+  category: public.app-category.productivity
+  artifactName: '${productName}-${version}-script-mac-${arch}.${ext}'
+
+dmg:
+  contents:
+    - x: 130
+      y: 220
+    - x: 410
+      y: 220
+      type: link
+      path: /Applications
+
+linux:
+  target:
+    - target: AppImage
+      arch:
+        - x64
+  icon: public/logo.png
+  category: Utility
+  artifactName: '${productName}-${version}-script-linux-${arch}.${ext}'
+
+asar: false

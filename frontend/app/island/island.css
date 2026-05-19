@@ -1,0 +1,51 @@
+/* Island 页面专用样式 */
+/* 注意: globals.css 已在 layout.tsx 中导入，提供 CSS 变量和主题支持 */
+
+/* 形态1/2: 确保透明背景（用于悬浮窗口） */
+/* 仅在 island-container 存在时设置透明背景 */
+html:has(.island-container),
+html:has(.island-container) body {
+  background-color: transparent;
+}
+
+.island-root {
+  width: 100%;
+  height: 100vh;
+  overflow: hidden;
+  font-family: "Plus Jakarta Sans", "Segoe UI", -apple-system, BlinkMacSystemFont,
+    "Helvetica Neue", Arial, sans-serif;
+}
+
+/* 隐藏滚动条但保留滚动功能 */
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Island 容器 - 用于形态1/2的透明悬浮窗 */
+.island-container {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  overflow: hidden;
+  background: transparent;
+  color: oklch(var(--foreground));
+}
+
+/* 形态3/4: 使用 FreeTodo 主题背景 */
+.island-root:has(.bg-background) {
+  background: oklch(var(--background));
+}
+
+/* app-region 用于窗口拖拽 */
+.app-region-drag {
+  -webkit-app-region: drag;
+}
+
+.app-region-no-drag {
+  -webkit-app-region: no-drag;
+}

@@ -1,0 +1,50 @@
+# Task Breakdown Tool Messages - English
+
+# Task breakdown guide (for Agent to break down directly, avoiding nested LLM calls)
+breakdown_guide: |
+  Please break down the following task into specific, actionable subtasks.
+
+  **Task Description:**
+  {task_description}
+
+  **Breakdown Requirements:**
+  1. Each subtask should be specific and actionable
+  2. Subtasks should have a logical execution order
+  3. Estimate time for each subtask (optional)
+  4. Display in a clear list format with name, description, and estimated time for each subtask
+
+  **Output Format Example:**
+  1. Subtask Name
+     Detailed description
+     [Estimated time]
+  2. Subtask Name
+     Detailed description
+     [Estimated time]
+
+  Please break down the task directly and display the results without calling other tools.
+
+# Keep old message keys for compatibility (deprecated but kept for reference)
+breakdown_prompt: |
+  Please break down the following task into specific, actionable subtasks.
+
+  **Task Description:**
+  {task_description}
+
+  **Requirements:**
+  1. Each subtask should be specific and actionable
+  2. Subtasks should have a logical execution order
+  3. Estimate time for each subtask (optional)
+  4. Return in JSON format
+
+  **Return Format:**
+  ```json
+  {{
+    "subtasks": [
+      {{"name": "subtask name", "description": "details", "estimated_time": "estimated time"}},
+      ...
+    ]
+  }}
+  ```
+
+breakdown_result: "Task breakdown result:\n{result}"
+breakdown_failed: "Failed to break down task: {error}"

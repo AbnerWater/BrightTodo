@@ -1,0 +1,19 @@
+# Rust formatting configuration
+# See: https://rust-lang.github.io/rustfmt/
+
+# Maximum line width
+max_width = 100
+
+# Use spaces for indentation
+hard_tabs = false
+tab_spaces = 4
+
+# Edition
+edition = "2021"
+
+# Imports organization (stable options only)
+reorder_imports = true
+
+# Formatting
+newline_style = "Auto"
+use_small_heuristics = "Default"

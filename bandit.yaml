@@ -1,0 +1,11 @@
+exclude_dirs:
+  - .venv
+  - data
+  - dist
+  - build
+  - migrations/versions
+  - lifetrace/data
+  - lifetrace/migrations/versions
+  - lifetrace/build
+  - lifetrace/dist
+skips: []

@@ -1,0 +1,4 @@
+# 时间解析工具消息 - 中文版
+
+parse_time_success: "解析结果: {result}"
+parse_time_failed: "无法解析时间表达式 \"{expression}\": {error}"

@@ -1,0 +1,6 @@
+# 冲突检测工具消息 - 中文版
+
+conflict_found: "在 {time_range} 时间段内发现 {count} 个冲突:\n{conflicts}"
+conflict_item: "- #{id} {name} ({start} - {end})"
+no_conflict: "在 {time_range} 时间段内没有冲突，可以安排"
+conflict_failed: "冲突检测失败: {error}"

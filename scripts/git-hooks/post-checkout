@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+root="$(git rev-parse --show-toplevel 2>/dev/null || exit 0)"
+
+# Skip main worktree where .git is a directory; worktrees have .git as a file.
+if [[ -d "$root/.git" ]]; then
+  exit 0
+fi
+
+if [[ -f "$root/scripts/link_worktree_deps_here.ps1" || -f "$root/scripts/link_worktree_deps_here.sh" ]]; then
+  case "$(uname -s)" in
+    MINGW*|MSYS*|CYGWIN*)
+      powershell -ExecutionPolicy Bypass -File "$root/scripts/link_worktree_deps_here.ps1"
+      ;;
+    *)
+      bash "$root/scripts/link_worktree_deps_here.sh"
+      ;;
+  esac
+fi
