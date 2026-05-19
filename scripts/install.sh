@@ -700,7 +700,7 @@ else
   cd "$TARGET_DIR"
 fi
 
-if [ -d ".venv" ] && [ -d "free-todo-frontend/node_modules" ]; then
+if [ -d ".venv" ] && [ -d "frontend/node_modules" ]; then
   DEPS_READY=1
 fi
 
@@ -712,7 +712,7 @@ if [ "$REPO_READY" -eq 0 ] || [ "$DEPS_READY" -eq 0 ]; then
   git fetch --depth 1 "$REPO_URL" "$REF"
   git checkout -q -B "$REF" FETCH_HEAD
   uv sync
-  if [ -d ".venv" ] && [ -d "free-todo-frontend/node_modules" ]; then
+  if [ -d ".venv" ] && [ -d "frontend/node_modules" ]; then
     DEPS_READY=1
   fi
 else
@@ -736,7 +736,7 @@ case "$MODE" in
     }
     trap cleanup EXIT
 
-    cd free-todo-frontend
+    cd frontend
     if [ ! -d "node_modules" ]; then
       pnpm install
     fi
@@ -756,7 +756,7 @@ case "$MODE" in
     fi
     ;;
   tauri)
-    cd free-todo-frontend
+    cd frontend
     if [ ! -d "node_modules" ]; then
       pnpm install
     fi
@@ -795,7 +795,7 @@ case "$MODE" in
     fi
     ;;
   electron)
-    cd free-todo-frontend
+    cd frontend
     if [ ! -d "node_modules" ]; then
       pnpm install
     fi

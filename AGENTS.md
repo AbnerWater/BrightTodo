@@ -5,7 +5,7 @@
 - `lifetrace/`: FastAPI backend (routers, services, repositories, storage, llm, jobs, util).
 - `lifetrace/config/`: runtime configuration (`config.yaml` is generated from `default_config.yaml`).
 - `lifetrace/data/`: runtime data (SQLite DB, vector DB, logs) — do not commit.
-- `free-todo-frontend/`: Next.js + React frontend, Electron wrapper, and scripts.
+- `frontend/`: Next.js + React frontend, Electron wrapper, and scripts.
 - `.github/`: contribution docs, guidelines, and repository assets.
 
 ## Build, Test, and Development Commands
@@ -16,7 +16,7 @@ Backend (from repo root):
 - `python -m lifetrace.server` — start FastAPI server (auto-selects port from 8001).
 - `uv run ruff check .` / `uv run ruff format .` — lint/format backend.
 
-Frontend (from `free-todo-frontend/`):
+Frontend (from `frontend/`):
 
 - `pnpm install` — install frontend deps.
 - `pnpm dev` — start Next.js dev server with auto-port detection.

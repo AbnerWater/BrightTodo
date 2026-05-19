@@ -63,8 +63,8 @@ $worktreeRoot = Resolve-FullPath $Worktree
 
 Ensure-Junction `
     -Name "frontend node_modules" `
-    -Source (Join-Path $mainRoot "free-todo-frontend\node_modules") `
-    -Dest (Join-Path $worktreeRoot "free-todo-frontend\node_modules")
+    -Source (Join-Path $mainRoot "frontend\node_modules") `
+    -Dest (Join-Path $worktreeRoot "frontend\node_modules")
 
 Ensure-Junction `
     -Name "python .venv" `

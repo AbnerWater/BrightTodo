@@ -80,7 +80,7 @@ python -m lifetrace.server
 进入前端目录后执行：
 
 ```bash
-cd free-todo-frontend
+cd frontend
 pnpm install
 pnpm dev
 ```
@@ -99,7 +99,7 @@ uv run ruff format .
 前端：
 
 ```bash
-cd free-todo-frontend
+cd frontend
 pnpm lint
 pnpm format
 pnpm check

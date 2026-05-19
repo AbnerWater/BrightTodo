@@ -45,6 +45,16 @@ function isSymlinkedNodeModules() {
 	}
 }
 
+function shouldUseWebpackDevServer() {
+	if (process.env.NEXT_USE_WEBPACK === "1") {
+		return true;
+	}
+	if (process.env.NEXT_USE_TURBOPACK === "1") {
+		return false;
+	}
+	return process.platform === "win32";
+}
+
 /**
  * 获取当前 Git Commit
  * @returns {string|null} - 完整 Commit Hash，获取失败则返回 null
@@ -227,10 +237,10 @@ async function main() {
 		console.log(`\nBackend API: ${backendUrl}`);
 		console.log(`Frontend URL: http://localhost:${frontendPort}\n`);
 
-		const disableTurbopack = isSymlinkedNodeModules();
+		const disableTurbopack = isSymlinkedNodeModules() || shouldUseWebpackDevServer();
 		if (disableTurbopack && !process.env.NEXT_DISABLE_TURBOPACK) {
 			console.log(
-				"Detected symlinked node_modules, disabling Turbopack for compatibility.",
+				"Using webpack dev server for dependency resolution compatibility.",
 			);
 		}
 

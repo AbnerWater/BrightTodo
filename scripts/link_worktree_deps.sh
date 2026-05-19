@@ -75,8 +75,8 @@ link_item() {
 }
 
 link_item "frontend node_modules" \
-  "$main_root/free-todo-frontend/node_modules" \
-  "$worktree_root/free-todo-frontend/node_modules"
+  "$main_root/frontend/node_modules" \
+  "$worktree_root/frontend/node_modules"
 
 link_item "python .venv" \
   "$main_root/.venv" \

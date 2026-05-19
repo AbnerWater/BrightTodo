@@ -405,7 +405,7 @@ if (Test-Path $Dir) {
 }
 
 $venvReady = Test-Path (Join-Path (Get-Location).Path ".venv")
-$frontendModulesReady = Test-Path (Join-Path (Get-Location).Path "free-todo-frontend\node_modules")
+$frontendModulesReady = Test-Path (Join-Path (Get-Location).Path "frontend\node_modules")
 $depsReady = $venvReady -and $frontendModulesReady
 
 if (-not $repoReady -or -not $depsReady) {
@@ -417,7 +417,7 @@ if (-not $repoReady -or -not $depsReady) {
     git checkout -q -B "$Ref" FETCH_HEAD
     uv sync
     $venvReady = Test-Path (Join-Path (Get-Location).Path ".venv")
-    $frontendModulesReady = Test-Path (Join-Path (Get-Location).Path "free-todo-frontend\node_modules")
+    $frontendModulesReady = Test-Path (Join-Path (Get-Location).Path "frontend\node_modules")
     $depsReady = $venvReady -and $frontendModulesReady
 } else {
     Write-Host "Repository is up to date. Skipping install steps."
@@ -437,7 +437,7 @@ if ($Mode -eq "web") {
     } -ArgumentList (Get-Location).Path, $uvPath, $pythonCmd
 
     try {
-        Set-Location (Join-Path (Get-Location).Path "free-todo-frontend")
+        Set-Location (Join-Path (Get-Location).Path "frontend")
         if (-not $frontendModulesReady) {
             pnpm install
         }
@@ -462,7 +462,7 @@ if ($Mode -eq "web") {
         }
     }
 } elseif ($Mode -eq "tauri") {
-    Set-Location (Join-Path (Get-Location).Path "free-todo-frontend")
+    Set-Location (Join-Path (Get-Location).Path "frontend")
     if (-not $frontendModulesReady) {
         pnpm install
     }
@@ -511,7 +511,7 @@ if ($Mode -eq "web") {
         }
     }
 } else {
-    Set-Location (Join-Path (Get-Location).Path "free-todo-frontend")
+    Set-Location (Join-Path (Get-Location).Path "frontend")
     if (-not $frontendModulesReady) {
         pnpm install
     }
