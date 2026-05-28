@@ -32,7 +32,7 @@ export const useUiStore = create<UiStoreState>()(
 			dockDisplayMode: DEFAULT_PANEL_STATE.dockDisplayMode,
 			// 是否显示 Agno 工具选择器
 			showAgnoToolSelector: DEFAULT_PANEL_STATE.showAgnoToolSelector,
-			// Agno 模式下选中的 FreeTodo 工具
+			// Agno 模式下选中的 BrightToDo 工具
 			selectedAgnoTools: DEFAULT_PANEL_STATE.selectedAgnoTools,
 			// Agno 模式下选中的外部工具
 			selectedExternalTools: DEFAULT_PANEL_STATE.selectedExternalTools,
@@ -428,7 +428,7 @@ export const useUiStore = create<UiStoreState>()(
 					showAgnoToolSelector: show,
 				})),
 
-			// 设置 Agno 模式下选中的 FreeTodo 工具
+			// 设置 Agno 模式下选中的 BrightToDo 工具
 			setSelectedAgnoTools: (tools) =>
 				set(() => ({
 					selectedAgnoTools: tools,

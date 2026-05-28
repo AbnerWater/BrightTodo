@@ -11,7 +11,7 @@ import { IslandMode } from "@/lib/island/types";
  * 作为 Dynamic Island 窗口的入口点
  *
  * 形态1/2: 使用 DynamicIsland 动画组件
- * 形态3/4: 直接渲染面板内容，保持与原 FreeTodo 一致的外观
+ * 形态3/4: 直接渲染面板内容，保持 BrightToDo 主界面外观
  */
 export default function IslandPage() {
   const [mode, setMode] = useState<IslandMode>(IslandMode.FLOAT);

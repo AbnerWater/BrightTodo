@@ -307,7 +307,7 @@ async function confirmStopInstallation(): Promise<void> {
 		buttons: ["继续等待", "停止安装"],
 		defaultId: 0,
 		cancelId: 0,
-		message: "确定要停止安装 FreeTodo 吗？",
+		message: "确定要停止安装 BrightToDo 吗？",
 		detail: "停止后需要重新启动安装流程。",
 	});
 	stopPromptOpen = false;

@@ -108,7 +108,7 @@ export const FloatContent: React.FC<FloatContentProps> = ({ onModeChange }) => (
   </motion.div>
 );
 
-// --- 2. POPUP STATE: FreeTodo 风格的通知弹窗 ---
+// --- 2. POPUP STATE: BrightToDo 风格的通知弹窗 ---
 interface PopupContentProps {
   todos: { id: number; name: string }[];
   onOpenSidebar?: () => void;
@@ -138,7 +138,7 @@ export const PopupContent: React.FC<PopupContentProps> = ({ todos, onOpenSidebar
           {/* Light mode logo */}
           <Image
             src="/free-todo-logos/free_todo_icon_4_dark_with_grid.png"
-            alt="Free Todo Logo"
+            alt="BrightToDo Logo"
             width={36}
             height={36}
             className="object-contain block dark:hidden"
@@ -146,7 +146,7 @@ export const PopupContent: React.FC<PopupContentProps> = ({ todos, onOpenSidebar
           {/* Dark mode logo */}
           <Image
             src="/free-todo-logos/free_todo_icon_4_with_grid.png"
-            alt="Free Todo Logo"
+            alt="BrightToDo Logo"
             width={36}
             height={36}
             className="object-contain hidden dark:block"

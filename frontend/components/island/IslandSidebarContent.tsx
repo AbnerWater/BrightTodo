@@ -3,7 +3,7 @@
 /**
  * Island 侧边栏内容组件
  * 在 SIDEBAR 模式下支持单栏/双栏/三栏展开
- * 直接使用 FreeTodo 原有的样式，保持一致性
+ * 直接使用 BrightToDo 主界面样式，保持一致性
  */
 
 import { ChevronLeft, ChevronRight } from "lucide-react";

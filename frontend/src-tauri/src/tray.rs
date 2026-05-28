@@ -40,7 +40,7 @@ pub fn setup_tray(app: &App) -> Result<(), Box<dyn std::error::Error>> {
 
     let separator3 = PredefinedMenuItem::separator(handle)?;
 
-    let quit = MenuItem::with_id(handle, "quit", "Quit FreeTodo", true, Some("CmdOrCtrl+Q"))?;
+    let quit = MenuItem::with_id(handle, "quit", "Quit BrightToDo", true, Some("CmdOrCtrl+Q"))?;
 
     // Build the menu
     let menu = Menu::with_items(
@@ -64,7 +64,7 @@ pub fn setup_tray(app: &App) -> Result<(), Box<dyn std::error::Error>> {
     let _tray = TrayIconBuilder::new()
         .icon(icon)
         .menu(&menu)
-        .tooltip("FreeTodo - Dynamic Island")
+        .tooltip("BrightToDo - Dynamic Island")
         .on_menu_event(move |app, event| {
             handle_menu_event(app, event.id.as_ref());
         })

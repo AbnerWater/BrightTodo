@@ -16,8 +16,8 @@ interface RootLayoutProps {
 }
 
 export const metadata: Metadata = {
-	title: "Free Todo",
-	description: "A todo app that tracks your life.",
+	title: "BrightToDo",
+	description: "An intelligent todo assistant for study planning.",
 };
 
 export default async function RootLayout({ children }: RootLayoutProps) {

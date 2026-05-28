@@ -17,9 +17,15 @@ export function VersionInfoSection() {
 	const versionString = `${version}_${buildType}_${gitCommit}`;
 
 	return (
-		<div className="text-center text-sm text-muted-foreground">
-			<span>{t("currentVersion")}：</span>
-			<span className="font-mono">{versionString}</span>
+		<div className="space-y-3 text-sm text-muted-foreground">
+			<div className="text-center">
+				<span>{t("currentVersion")}：</span>
+				<span className="font-mono">{versionString}</span>
+			</div>
+			<div className="rounded-md border border-border bg-muted/30 px-3 py-2 text-left">
+				<div className="font-medium text-foreground">{t("sourceProject")}</div>
+				<p className="mt-1 leading-relaxed">{t("sourceProjectDescription")}</p>
+			</div>
 		</div>
 	);
 }

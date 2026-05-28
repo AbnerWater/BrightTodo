@@ -1,4 +1,4 @@
-//! Configuration constants for FreeTodo
+//! BrightToDo 配置常量
 //!
 //! Centralized configuration management for ports, timeouts, and paths.
 //!

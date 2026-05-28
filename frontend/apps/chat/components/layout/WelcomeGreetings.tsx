@@ -30,7 +30,7 @@ export function WelcomeGreetings({
 						{/* 浅色模式图标 */}
 						<Image
 							src="/free-todo-logos/free_todo_icon_4_dark_with_grid.png"
-							alt="Free Todo Logo"
+							alt="BrightToDo Logo"
 							width={128}
 							height={128}
 							className="object-contain block dark:hidden"
@@ -38,7 +38,7 @@ export function WelcomeGreetings({
 						{/* 深色模式图标 */}
 						<Image
 							src="/free-todo-logos/free_todo_icon_4_with_grid.png"
-							alt="Free Todo Logo"
+							alt="BrightToDo Logo"
 							width={128}
 							height={128}
 							className="object-contain hidden dark:block"

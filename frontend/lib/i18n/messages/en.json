@@ -21,7 +21,7 @@
 		"openSettings": "Open Settings"
 	},
 	"page": {
-		"title": "Free Todo Canvas",
+		"title": "BrightToDo Canvas",
 		"subtitle": "Calendar and Todos view side by side. Toggle via bottom dock and resize panels by dragging the handle.",
 		"calendarLabel": "Calendar View",
 		"calendarPlaceholder": "Placeholder: plug a calendar component here",
@@ -32,7 +32,7 @@
 		"todoListTitle": "Todos",
 		"chatLabel": "AI Chat",
 		"chatPlaceholder": "Placeholder: plug an AI chat component here",
-		"chatTitle": "Free Todo - AI Assistant",
+		"chatTitle": "BrightToDo - AI Assistant",
 		"chatSubtitle": "A personalized AI chat app that helps you manage todos and boost productivity.",
 		"chatQuestion": "How can I help you today?",
 		"chatSuggestion1": "Break down today's todos and prioritize",
@@ -89,7 +89,7 @@
 			"searchNoResultsTitle": "No matching settings",
 			"searchNoResultsHint": "Try a different keyword.",
 			"aboutTitle": "Version & Info",
-			"aboutDescription": "View current version and build details.",
+			"aboutDescription": "View current version, build details, and open-source base information.",
 			"journalSettingsTitle": "Journal Settings",
 			"journalSettingsDescription": "Configure daily reset and auto generation for journals.",
 			"journalRefreshModeLabel": "Refresh mode",
@@ -198,7 +198,9 @@
 			"enable24x7Recording": "Auto Start Recording",
 			"enable24x7RecordingDesc": "When enabled, recording will automatically start when opening the app",
 			"audioAsrConfig": "Audio Recognition (ASR) Configuration",
-			"currentVersion": "Current Version"
+			"currentVersion": "Current Version",
+			"sourceProject": "Open-source base",
+			"sourceProjectDescription": "BrightToDo is built on the FreeToDo open-source project, keeping its todo management foundation while extending the AI Agent capabilities required by the course project."
 		},
 		"costTracking": {
 			"title": "Cost Tracking",
@@ -392,7 +394,7 @@
 	},
 	"chat": {
 		"greetings": {
-			"title": "Free Todo, Just Do It",
+			"title": "BrightToDo, Just Do It",
 			"subtitle": "Your intelligent todo assistant for breaking down tasks, prioritizing, and getting things done"
 		},
 		"planModeInputPlaceholder": "e.g. Help me plan the todos for moving this weekend",
@@ -537,7 +539,7 @@
 			"allSelected": "All tools enabled",
 			"noneSelected": "No tools selected",
 			"externalTools": "External Tools",
-			"freetodoTools": "Todo Tools",
+			"brighttodoTools": "Todo Tools",
 			"categories": {
 				"todo": "Todo Management",
 				"breakdown": "Task Breakdown",
@@ -1046,7 +1048,7 @@
 		"extracting": "Extracting todos..."
 	},
 	"onboarding": {
-		"welcomeTitle": "Welcome to Free Todo",
+		"welcomeTitle": "Welcome to BrightToDo",
 		"welcomeDescription": "Let's quickly set up your AI assistant.",
 		"apiKeyStepTitle": "API Key",
 		"apiKeyStepDescription": "Enter your Aliyun Bailian API Key.",

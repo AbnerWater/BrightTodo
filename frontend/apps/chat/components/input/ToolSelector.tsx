@@ -7,10 +7,10 @@ import { useUiStore } from "@/lib/store/ui-store";
 import { cn } from "@/lib/utils";
 
 /**
- * FreeTodo 工具列表定义
- * 基于 FreeTodoToolkit 的 14 个工具
+ * BrightToDo 工具列表定义
+ * 基于待办工具集的 14 个工具
  */
-const FREETODO_TOOLS = [
+const BRIGHTTODO_TOOLS = [
 	// Todo 管理工具（6个）
 	{ id: "create_todo", category: "todo" },
 	{ id: "complete_todo", category: "todo" },
@@ -56,7 +56,7 @@ interface ToolSelectorProps {
 /**
  * Agno 模式工具选择器组件
  * 显示为一个按钮，点击后展开多选下拉框
- * 支持 FreeTodo 工具和外部工具（如 DuckDuckGo 搜索）
+ * 支持 BrightToDo 工具和外部工具（如 DuckDuckGo 搜索）
  */
 export function ToolSelector({ disabled = false }: ToolSelectorProps) {
 	const tChat = useTranslations("chat");
@@ -64,7 +64,7 @@ export function ToolSelector({ disabled = false }: ToolSelectorProps) {
 	const [isOpen, setIsOpen] = useState(false);
 	const dropdownRef = useRef<HTMLDivElement>(null);
 
-	// FreeTodo 工具状态
+	// BrightToDo 工具状态
 	const selectedAgnoTools = useUiStore((state) => state.selectedAgnoTools);
 	const setSelectedAgnoTools = useUiStore(
 		(state) => state.setSelectedAgnoTools,
@@ -95,12 +95,12 @@ export function ToolSelector({ disabled = false }: ToolSelectorProps) {
 		return () => document.removeEventListener("mousedown", handleClickOutside);
 	}, [isOpen]);
 
-	// FreeTodo 工具切换
-	const handleToggleFreetodoTool = (toolId: string) => {
+	// BrightToDo 工具切换
+	const handleToggleBrighttodoTool = (toolId: string) => {
 		const newTools = selectedAgnoTools.includes(toolId)
 			? selectedAgnoTools.filter((id) => id !== toolId)
 			: [...selectedAgnoTools, toolId];
-		console.log("[ToolSelector] Toggling FreeTodo tool:", toolId);
+		console.log("[ToolSelector] Toggling BrightToDo tool:", toolId);
 		console.log("[ToolSelector] New selectedAgnoTools:", newTools);
 		setSelectedAgnoTools(newTools);
 	};
@@ -115,11 +115,11 @@ export function ToolSelector({ disabled = false }: ToolSelectorProps) {
 		setSelectedExternalTools(newTools);
 	};
 
-	const handleSelectAllFreetodo = () => {
-		setSelectedAgnoTools(FREETODO_TOOLS.map((tool) => tool.id));
+	const handleSelectAllBrighttodo = () => {
+		setSelectedAgnoTools(BRIGHTTODO_TOOLS.map((tool) => tool.id));
 	};
 
-	const handleDeselectAllFreetodo = () => {
+	const handleDeselectAllBrighttodo = () => {
 		setSelectedAgnoTools([]);
 	};
 
@@ -132,10 +132,10 @@ export function ToolSelector({ disabled = false }: ToolSelectorProps) {
 	};
 
 	// 计算选中数量
-	const freetodoSelectedCount = selectedAgnoTools.length;
+	const brighttodoSelectedCount = selectedAgnoTools.length;
 	const externalSelectedCount = selectedExternalTools.length;
-	const totalSelectedCount = freetodoSelectedCount + externalSelectedCount;
-	const totalToolsCount = FREETODO_TOOLS.length + EXTERNAL_TOOLS.length;
+	const totalSelectedCount = brighttodoSelectedCount + externalSelectedCount;
+	const totalToolsCount = BRIGHTTODO_TOOLS.length + EXTERNAL_TOOLS.length;
 	const isAllSelected = totalSelectedCount === totalToolsCount;
 
 	return (
@@ -258,19 +258,19 @@ export function ToolSelector({ disabled = false }: ToolSelectorProps) {
 						{/* 分隔线 */}
 						<div className="border-t border-border my-2" />
 
-						{/* FreeTodo 工具区域 */}
+						{/* BrightToDo 工具区域 */}
 						<div>
 							<div className="flex items-center justify-between mb-2 px-2">
 								<div className="flex items-center gap-1.5">
 									<Wrench className="h-3.5 w-3.5 text-muted-foreground" />
 									<span className="text-xs font-medium text-muted-foreground">
-										{tChat("toolSelector.freetodoTools")}
+										{tChat("toolSelector.brighttodoTools")}
 									</span>
 								</div>
 								<div className="flex gap-2">
 									<button
 										type="button"
-										onClick={handleSelectAllFreetodo}
+										onClick={handleSelectAllBrighttodo}
 										className="text-xs text-primary hover:underline"
 									>
 										{tChat("toolSelector.selectAll")}
@@ -278,7 +278,7 @@ export function ToolSelector({ disabled = false }: ToolSelectorProps) {
 									<span className="text-xs text-muted-foreground">|</span>
 									<button
 										type="button"
-										onClick={handleDeselectAllFreetodo}
+										onClick={handleDeselectAllBrighttodo}
 										className="text-xs text-primary hover:underline"
 									>
 										{tChat("toolSelector.deselectAll")}
@@ -286,7 +286,7 @@ export function ToolSelector({ disabled = false }: ToolSelectorProps) {
 								</div>
 							</div>
 							{Object.entries(
-								FREETODO_TOOLS.reduce(
+								BRIGHTTODO_TOOLS.reduce(
 									(acc, tool) => {
 										if (!acc[tool.category]) {
 											acc[tool.category] = [];
@@ -296,7 +296,7 @@ export function ToolSelector({ disabled = false }: ToolSelectorProps) {
 									},
 									{} as Record<
 										string,
-										Array<(typeof FREETODO_TOOLS)[number]>
+										Array<(typeof BRIGHTTODO_TOOLS)[number]>
 									>,
 								),
 							).map(([category, tools]) => (
@@ -313,7 +313,7 @@ export function ToolSelector({ disabled = false }: ToolSelectorProps) {
 												<button
 													key={tool.id}
 													type="button"
-													onClick={() => handleToggleFreetodoTool(tool.id)}
+													onClick={() => handleToggleBrighttodoTool(tool.id)}
 													className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-sm hover:bg-accent"
 												>
 													<div

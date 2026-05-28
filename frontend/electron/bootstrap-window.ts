@@ -13,7 +13,7 @@ function getBootstrapHtml(): string {
 <html lang="en">
 	<head>
 		<meta charset="utf-8" />
-		<title>FreeTodo Setup</title>
+		<title>BrightToDo Setup</title>
 		<style>
 			:root {
 				color-scheme: light;
@@ -136,7 +136,7 @@ function getBootstrapHtml(): string {
 	<body>
 		<div class="container">
 			<div class="card">
-				<div class="title">正在准备 FreeTodo</div>
+				<div class="title">正在准备 BrightToDo</div>
 				<div class="subtitle">首次启动会自动安装 Python 3.12 与依赖。</div>
 				<div class="progress"><div id="progressBar"></div></div>
 				<div class="status" id="statusText">准备中...</div>
@@ -231,7 +231,7 @@ export function createBootstrapWindow(): BrowserWindow {
 		height: 400,
 		resizable: false,
 		show: false,
-		title: "FreeTodo Setup",
+		title: "BrightToDo Setup",
 		closable: true,
 		alwaysOnTop: true,
 		backgroundColor: "#f8f6f1",

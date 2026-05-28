@@ -61,7 +61,7 @@ export const DEFAULT_PANEL_STATE = {
 	dockDisplayMode: "fixed" as DockDisplayMode,
 	// 是否显示 Agno 模式的工具选择器（默认开启）
 	showAgnoToolSelector: true,
-	// Agno 模式下选中的 FreeTodo 工具列表（默认只选中 todo 管理类工具）
+	// Agno 模式下选中的 BrightToDo 工具列表（默认只选中 todo 管理类工具）
 	selectedAgnoTools: [
 		"create_todo",
 		"complete_todo",

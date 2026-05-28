@@ -25,7 +25,7 @@ export function MaximizeHeader({ hasNotifications }: MaximizeHeaderProps) {
 					{/* 浅色模式图标 */}
 					<Image
 						src="/free-todo-logos/free_todo_icon_4_dark_with_grid.png"
-						alt="Free Todo Logo"
+						alt="BrightToDo Logo"
 						width={32}
 						height={32}
 						className="object-contain block dark:hidden"
@@ -33,14 +33,14 @@ export function MaximizeHeader({ hasNotifications }: MaximizeHeaderProps) {
 					{/* 深色模式图标 */}
 					<Image
 						src="/free-todo-logos/free_todo_icon_4_with_grid.png"
-						alt="Free Todo Logo"
+						alt="BrightToDo Logo"
 						width={32}
 						height={32}
 						className="object-contain hidden dark:block"
 					/>
 				</div>
 				<h1 className="text-lg font-semibold tracking-tight text-foreground">
-					Free Todo: Your AI Secretary
+					BrightToDo: Your AI Secretary
 				</h1>
 			</div>
 

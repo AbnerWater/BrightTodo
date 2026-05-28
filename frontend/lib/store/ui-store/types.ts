@@ -39,7 +39,7 @@ export interface UiStoreState {
 	dockDisplayMode: DockDisplayMode;
 	// 是否显示 Agno 模式的工具选择器（默认关闭）
 	showAgnoToolSelector: boolean;
-	// Agno 模式下选中的 FreeTodo 工具列表（空数组表示不使用任何工具）
+	// Agno 模式下选中的 BrightToDo 工具列表（空数组表示不使用任何工具）
 	selectedAgnoTools: string[];
 	// Agno 模式下选中的外部工具列表（如 ['duckduckgo']）
 	selectedExternalTools: string[];
@@ -91,7 +91,7 @@ export interface UiStoreState {
 	setDockDisplayMode: (mode: DockDisplayMode) => void;
 	// 设置是否显示 Agno 工具选择器
 	setShowAgnoToolSelector: (show: boolean) => void;
-	// 设置 Agno 模式下选中的 FreeTodo 工具
+	// 设置 Agno 模式下选中的 BrightToDo 工具
 	setSelectedAgnoTools: (tools: string[]) => void;
 	// 设置 Agno 模式下选中的外部工具
 	setSelectedExternalTools: (tools: string[]) => void;

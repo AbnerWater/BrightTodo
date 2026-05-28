@@ -36,7 +36,7 @@ html:has(.island-container) body {
   color: oklch(var(--foreground));
 }
 
-/* 形态3/4: 使用 FreeTodo 主题背景 */
+/* 形态3/4: 使用 BrightToDo 主题背景 */
 .island-root:has(.bg-background) {
   background: oklch(var(--background));
 }

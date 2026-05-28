@@ -9,12 +9,12 @@ import "./island.css";
 
 export const metadata: Metadata = {
   title: "Dynamic Island",
-  description: "FreeTodo Dynamic Island Widget",
+  description: "BrightToDo Dynamic Island Widget",
 };
 
 /**
  * Island 页面独立布局
- * 包含必要的 Provider 以支持 FreeTodo 组件
+ * 包含必要的 Provider 以支持 BrightToDo 组件
  * 注意：不使用独立的 html/body，而是作为子布局
  */
 export default async function IslandLayout({

@@ -1,6 +1,6 @@
-//! FreeTodo - Main Entry Point
+//! BrightToDo - Main Entry Point
 //!
-//! This is the main entry point for the FreeTodo Tauri application.
+//! This is the main entry point for the BrightToDo Tauri application.
 //! It initializes the application and starts all required services.
 
 #![cfg_attr(

@@ -2,8 +2,8 @@
 
 /**
  * Island 全屏内容组件
- * 在 FULLSCREEN 模式下显示完整的 FreeTodo 三栏面板布局
- * 直接使用 FreeTodo 原有的样式，保持一致性
+ * 在 FULLSCREEN 模式下显示完整的 BrightToDo 三栏面板布局
+ * 直接使用 BrightToDo 主界面样式，保持一致性
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";

@@ -1,7 +1,7 @@
 [package]
 name = "free-todo"
 version = "0.1.2"
-description = "FreeTodo - Your Intelligent Todo Application"
+description = "BrightToDo - Your Intelligent Todo Application"
 license-file = "../../LICENSE"
 repository = "https://github.com/FreeU-group/FreeTodo"
 edition = "2021"

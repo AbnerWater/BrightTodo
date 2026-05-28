@@ -261,7 +261,7 @@ async function ensurePython312Installed(): Promise<PythonInfo> {
 			buttons: ["选择已有 Python", "自动安装", "取消"],
 			defaultId: 1,
 			cancelId: 2,
-			message: "FreeTodo 需要 Python 3.12 才能运行本地后端。",
+				message: "BrightToDo 需要 Python 3.12 才能运行本地后端。",
 			detail:
 				"你可以选择已有的 Python 3.12 环境，或者让程序自动安装。自动安装需要联网，可能会花费几分钟。",
 		});
@@ -376,7 +376,7 @@ async function ensureDependencies(
 		buttons: ["Continue"],
 		message: "Installing backend dependencies",
 		detail:
-			"This is the first launch. FreeTodo will now download and install Python dependencies. It may take several minutes depending on your network.",
+				"This is the first launch. BrightToDo will now download and install Python dependencies. It may take several minutes depending on your network.",
 	});
 
 	assertNotCancelled();

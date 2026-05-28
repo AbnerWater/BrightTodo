@@ -288,7 +288,7 @@ export class WindowManager {
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>FreeTodo 加载中</title>
+    <title>BrightToDo 加载中</title>
     <style>
       html, body { margin: 0; padding: 0; width: 100%; height: 100%; background: #0f1115; color: #e5e7eb; font-family: "Segoe UI", Arial, sans-serif; }
       .wrap { display: flex; align-items: center; justify-content: center; height: 100%; flex-direction: column; gap: 14px; }
@@ -301,7 +301,7 @@ export class WindowManager {
   <body>
     <div class="wrap">
       <div class="spinner"></div>
-      <div class="logo">FreeTodo</div>
+      <div class="logo">BrightToDo</div>
       <div class="hint">正在启动服务...</div>
     </div>
   </body>

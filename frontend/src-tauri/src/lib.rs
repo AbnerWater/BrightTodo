@@ -1,6 +1,6 @@
-//! FreeTodo - Tauri Application Library
+//! BrightToDo - Tauri Application Library
 //!
-//! This module contains the core functionality for the FreeTodo desktop application,
+//! This module contains the core functionality for the BrightToDo desktop application,
 //! including backend management, Next.js server management, system tray, and global shortcuts.
 //!
 //! ## Window Modes
@@ -41,7 +41,7 @@ pub fn run() {
     // Initialize logger
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
 
-    info!("Starting FreeTodo application...");
+    info!("Starting BrightToDo application...");
 
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())

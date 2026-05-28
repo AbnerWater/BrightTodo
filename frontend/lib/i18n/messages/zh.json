@@ -21,7 +21,7 @@
 		"openSettings": "打开设置"
 	},
 	"page": {
-		"title": "Free Todo Canvas",
+		"title": "BrightToDo Canvas",
 		"subtitle": "日历视图与待办视图并列排布，可通过底部 Dock 快速切换与组合，并支持拖拽调整宽度。",
 		"calendarLabel": "日历视图",
 		"calendarPlaceholder": "占位：在这里接入日历组件",
@@ -32,7 +32,7 @@
 		"todoListTitle": "待办",
 		"chatLabel": "AI 聊天",
 		"chatPlaceholder": "占位：在这里接入 AI 聊天组件",
-		"chatTitle": "Free Todo - AI 智能助手",
+		"chatTitle": "BrightToDo - AI 智能助手",
 		"chatSubtitle": "一个个性化的 AI 聊天应用，帮助您管理待办事项、提高效率。",
 		"chatQuestion": "今天我能为您做些什么？",
 		"chatSuggestion1": "拆解并排序今天的待办",
@@ -89,7 +89,7 @@
 			"searchNoResultsTitle": "未找到匹配的设置",
 			"searchNoResultsHint": "试试其他关键词。",
 			"aboutTitle": "版本与信息",
-			"aboutDescription": "查看当前版本号与构建信息。",
+			"aboutDescription": "查看当前版本号、构建信息与开源底座说明。",
 			"journalSettingsTitle": "日记设置",
 			"journalSettingsDescription": "配置日记的每日刷新点与自动生成策略。",
 			"journalRefreshModeLabel": "刷新模式",
@@ -198,7 +198,9 @@
 			"enable24x7Recording": "自动启动录音",
 			"enable24x7RecordingDesc": "启用后，打开应用时将自动开始录音",
 			"audioAsrConfig": "音频识别（ASR）配置",
-			"currentVersion": "当前版本"
+			"currentVersion": "当前版本",
+			"sourceProject": "开源底座",
+			"sourceProjectDescription": "BrightToDo 基于 FreeToDo 开源项目二次开发，保留其待办管理底座，并扩展课程所需的 AI Agent 能力。"
 		},
 		"costTracking": {
 			"title": "费用统计",
@@ -392,7 +394,7 @@
 	},
 	"chat": {
 		"greetings": {
-			"title": "Free Todo，放手去做",
+			"title": "BrightToDo，放手去做",
 			"subtitle": "智能待办助手，帮你拆解任务、规划优先级、提升效率"
 		},
 		"planModeInputPlaceholder": "例如：帮我规划周末搬家需要做的事",
@@ -537,7 +539,7 @@
 			"allSelected": "使用所有工具",
 			"noneSelected": "未选择任何工具",
 			"externalTools": "外部工具",
-			"freetodoTools": "待办工具",
+			"brighttodoTools": "待办工具",
 			"categories": {
 				"todo": "待办管理",
 				"breakdown": "任务拆解",
@@ -1046,7 +1048,7 @@
 		"extracting": "正在提取待办事项..."
 	},
 	"onboarding": {
-		"welcomeTitle": "欢迎使用 Free Todo",
+		"welcomeTitle": "欢迎使用 BrightToDo",
 		"welcomeDescription": "快速配置你的 AI 助手。",
 		"apiKeyStepTitle": "API Key",
 		"apiKeyStepDescription": "填写阿里云百炼大模型 API Key。",

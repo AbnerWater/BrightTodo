@@ -3,7 +3,7 @@
 /**
  * Island 专用 Header 组件
  * 用于形态3/4，提供窗口控制按钮
- * 与原 FreeTodo Header 共享 HeaderIsland 组件
+ * 与 BrightToDo 主 Header 共享 HeaderIsland 组件
  */
 
 import { Maximize2, Minimize2, Pin, PinOff, X } from "lucide-react";
@@ -82,7 +82,7 @@ export function IslandHeader({ mode, onModeChange, isExpanded = false, onDragSta
           {/* 浅色模式图标 */}
           <Image
             src="/free-todo-logos/free_todo_icon_4_dark_with_grid.png"
-            alt="Free Todo Logo"
+            alt="BrightToDo Logo"
             width={32}
             height={32}
             className="object-contain block dark:hidden"
@@ -90,18 +90,18 @@ export function IslandHeader({ mode, onModeChange, isExpanded = false, onDragSta
           {/* 深色模式图标 */}
           <Image
             src="/free-todo-logos/free_todo_icon_4_with_grid.png"
-            alt="Free Todo Logo"
+            alt="BrightToDo Logo"
             width={32}
             height={32}
             className="object-contain hidden dark:block"
           />
         </div>
         <h1 className="text-lg font-semibold tracking-tight text-foreground">
-          {isSidebar ? "FreeTodo" : "Free Todo: Your AI Secretary"}
+          {isSidebar ? "BrightToDo" : "BrightToDo: Your AI Secretary"}
         </h1>
       </div>
 
-      {/* 中间：HeaderIsland 通知区域（与原 FreeTodo 共享，仅在有通知时显示） */}
+      {/* 中间：HeaderIsland 通知区域（与 BrightToDo 主界面共享，仅在有通知时显示） */}
       {showNotification ? (
         <div className={`flex-1 flex items-center justify-center relative min-w-0 overflow-visible ${!canDrag ? 'app-region-no-drag' : ''}`}>
           <HeaderIsland />

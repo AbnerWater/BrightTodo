@@ -484,7 +484,7 @@ export class BackendServer extends ProcessManager {
 
 			// 检查应用标识
 			if (data.app !== "lifetrace") {
-				const errorMsg = `Backend at ${this.getUrl()} is not a FreeTodo server (app: ${data.app})`;
+				const errorMsg = `Backend at ${this.getUrl()} is not a BrightToDo server (app: ${data.app})`;
 				logger.error(errorMsg);
 				throw new Error(errorMsg);
 			}
@@ -492,7 +492,7 @@ export class BackendServer extends ProcessManager {
 			// 检查服务器模式
 			const backendMode = data.server_mode;
 			if (backendMode && backendMode !== this.serverMode) {
-				const errorMsg = `Backend mode mismatch: expected "${this.serverMode}", got "${backendMode}". This may indicate another version of FreeTodo is running.`;
+				const errorMsg = `Backend mode mismatch: expected "${this.serverMode}", got "${backendMode}". This may indicate another version of BrightToDo is running.`;
 				logger.error(errorMsg);
 				dialog.showErrorBox(
 					"Backend Mode Mismatch",
