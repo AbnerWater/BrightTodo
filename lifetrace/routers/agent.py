@@ -1,21 +1,33 @@
 """BrightToDo Agent 自研接口路由"""
 
-from fastapi import APIRouter, Request
+from datetime import datetime
+
+from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from fastapi.routing import APIRoute
 
+from lifetrace.core.dependencies import get_todo_service
 from lifetrace.schemas.agent import (
     AgentParseTaskRequest,
     AgentParseTaskResponse,
+    ImportTodosResponse,
     ScheduleSuggestRequest,
     ScheduleSuggestResponse,
+)
+from lifetrace.services.agent_import_service import (
+    MAX_IMPORT_FILE_BYTES,
+    MAX_IMPORT_FILE_COUNT,
+    AgentImportFile,
+    AgentImportService,
+    ImportTodosError,
 )
 from lifetrace.services.agent_parse_service import AgentParseService
 from lifetrace.services.schedule_suggest_service import (
     ScheduleSuggestError,
     ScheduleSuggestService,
 )
+from lifetrace.services.todo_service import TodoService
 
 MAX_TASK_TEXT_LENGTH = 500
 
@@ -52,6 +64,30 @@ class AgentValidationRoute(APIRoute):
 router = APIRouter(prefix="/api/agent", tags=["agent"], route_class=AgentValidationRoute)
 
 
+async def _read_import_files(files: list[UploadFile]) -> list[AgentImportFile]:
+    """按接口限制读取上传文件，避免超大文件在校验前进入内存。"""
+    if len(files) > MAX_IMPORT_FILE_COUNT:
+        raise ImportTodosError(400, "TOO_MANY_FILES", "最多一次上传 5 个文件")
+
+    import_files: list[AgentImportFile] = []
+    for file in files:
+        content = await file.read(MAX_IMPORT_FILE_BYTES + 1)
+        if len(content) > MAX_IMPORT_FILE_BYTES:
+            raise ImportTodosError(
+                413,
+                "FILE_TOO_LARGE",
+                f"{file.filename or '未命名文件'} 超过 10MB 限制",
+            )
+        import_files.append(
+            AgentImportFile(
+                file_name=file.filename or "",
+                mime_type=file.content_type,
+                content=content,
+            )
+        )
+    return import_files
+
+
 @router.post("/parse-task", response_model=AgentParseTaskResponse)
 async def parse_task(request: AgentParseTaskRequest):
     """解析中文自然语言任务描述"""
@@ -74,3 +110,24 @@ async def schedule_suggest(request: ScheduleSuggestRequest):
     except ScheduleSuggestError as exc:
         status_code = 422 if exc.error_code == "NO_AVAILABLE_SLOTS" else 400
         return _error_response(status_code, exc.error_code, exc.message)
+
+
+@router.post("/import-todos", response_model=ImportTodosResponse)
+async def import_todos(
+    files: list[UploadFile] = File(..., description="待解析文件列表"),
+    reference_time: datetime | None = Form(None, description="相对时间解析基准"),
+    create_todos: bool = Form(False, description="是否立即创建草稿待办"),
+    todo_service: TodoService = Depends(get_todo_service),
+):
+    """从图片或文档中解析待确认待办"""
+    service = AgentImportService()
+    try:
+        import_files = await _read_import_files(files)
+        return service.import_files(
+            files=import_files,
+            reference_time=reference_time,
+            create_todos=create_todos,
+            todo_service=todo_service,
+        )
+    except ImportTodosError as exc:
+        return _error_response(exc.status_code, exc.error_code, exc.message, exc.detail)

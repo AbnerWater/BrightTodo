@@ -42,6 +42,7 @@ Thumbs.db
 
 # LifeTrace specific
 lifetrace/data/
+lifetrace/logs/
 lifetrace/config/config.yaml
 
 # Frontend - Node.js cache and build artifacts

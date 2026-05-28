@@ -69,8 +69,8 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="FreeTodo API",
-    description="FreeTodo API (part of FreeU Project)",
+    title="BrightToDo API",
+    description="BrightToDo API",
     version="0.1.2",
     lifespan=lifespan,
 )

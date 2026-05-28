@@ -54,7 +54,7 @@ def _from_ical_dt(value: Any) -> datetime | None:
 
 def _build_calendar() -> Calendar:
     cal = Calendar()
-    cal.add("prodid", "-//LifeTrace//FreeTodo//EN")
+    cal.add("prodid", "-//LifeTrace//BrightToDo//EN")
     cal.add("version", "2.0")
     cal.add("calscale", "GREGORIAN")
     return cal

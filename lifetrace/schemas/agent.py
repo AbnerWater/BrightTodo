@@ -1,6 +1,7 @@
 """BrightToDo Agent 自研接口模型"""
 
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
@@ -84,6 +85,53 @@ class ScheduleSuggestResponse(BaseModel):
     suggestions: list[ScheduleSuggestion] = Field(..., description="编排建议列表")
     unscheduled_todos: list[int] = Field(..., description="无法安排的待办 ID 列表")
     planning_coverage_pct: float = Field(..., description="成功编排的待办百分比")
+
+
+class ImportTodoFileResult(BaseModel):
+    """单个文件导入处理结果"""
+
+    file_name: str = Field(..., description="文件名")
+    mime_type: str | None = Field(None, description="MIME 类型")
+    size_bytes: int = Field(..., description="文件大小")
+    status: Literal["success", "failed"] = Field(..., description="处理状态")
+    extracted_count: int = Field(0, description="提取出的待办数量")
+    error_code: str | None = Field(None, description="失败错误码")
+    message: str | None = Field(None, description="处理说明")
+    raw_text_preview: str | None = Field(None, description="文本预览")
+
+
+class ImportedTodoTask(BaseModel):
+    """从文件解析出的待确认任务"""
+
+    task_title: str = Field(..., description="解析出的任务标题")
+    priority: TodoPriority = Field(..., description="任务优先级")
+    due: datetime | None = Field(None, description="截止时间")
+    duration: str | None = Field(None, description="预估时长，ISO 8601 Duration")
+    description: str | None = Field(None, description="补充描述")
+    source_file: str = Field(..., description="来源文件名")
+    source_file_index: int = Field(..., ge=0, description="来源文件在本次上传中的序号")
+    source_text: str = Field(..., description="来源文本")
+    confidence: float = Field(..., ge=0, le=1, description="解析置信度")
+
+
+class ImportedCreatedTodo(BaseModel):
+    """导入接口创建出的待办摘要"""
+
+    id: int = Field(..., description="待办 ID")
+    name: str = Field(..., description="待办标题")
+    status: str = Field(..., description="待办状态")
+
+
+class ImportTodosResponse(BaseModel):
+    """文件导入待办响应"""
+
+    file_results: list[ImportTodoFileResult] = Field(..., description="文件处理结果")
+    extracted_tasks: list[ImportedTodoTask] = Field(..., description="待确认任务列表")
+    created_todos: list[ImportedCreatedTodo] = Field(
+        default_factory=list, description="已创建待办列表"
+    )
+    raw_text_preview: str = Field("", description="合并文本预览")
+    processing_time_ms: int = Field(..., description="处理耗时，毫秒")
 
 
 class AgentErrorResponse(BaseModel):

@@ -20,6 +20,7 @@ type InputBoxProps = {
 	modeMenuOpen?: boolean;
 	onAtClick?: () => void;
 	linkedTodos?: React.ReactNode;
+	uploadButton?: React.ReactNode;
 	/** 最大高度，默认为 "40vh"（视口高度的40%） */
 	maxHeight?: string;
 };
@@ -45,6 +46,7 @@ export function InputBox({
 	modeMenuOpen = false,
 	onAtClick,
 	linkedTodos,
+	uploadButton,
 	maxHeight = "40vh",
 }: InputBoxProps) {
 	const t = useTranslations("chat");
@@ -105,6 +107,8 @@ export function InputBox({
 	// 右侧按钮组（@ 按钮和发送/停止按钮）
 	const actionButtons = (
 		<div className="flex items-center gap-1">
+			{uploadButton}
+
 			<button
 				type="button"
 				onClick={onAtClick}

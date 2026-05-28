@@ -328,9 +328,14 @@ export function TodoList() {
 	if (error) {
 		const errorMessage =
 			error instanceof Error ? error.message : String(error) || "Unknown error";
+		const displayError = /API Error:\s*500|Failed to fetch|NetworkError/i.test(
+			errorMessage,
+		)
+			? tTodoList("backendDisconnected")
+			: tTodoList("loadFailed", { error: errorMessage });
 		return (
 			<div className="flex h-full items-center justify-center text-destructive">
-				{tTodoList("loadFailed", { error: errorMessage })}
+				{displayError}
 			</div>
 		);
 	}
