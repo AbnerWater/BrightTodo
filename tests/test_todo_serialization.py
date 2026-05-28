@@ -5,13 +5,13 @@ from lifetrace.storage.todo_manager_ical import TodoIcalMixin
 
 
 class StubTodoManager(TodoIcalMixin):
-    def _get_todo_tags(self, session, todo_id: int):
+    def _get_todo_tags(self, _session, _todo_id: int):
         return []
 
-    def _get_todo_attachments(self, session, todo_id: int):
+    def _get_todo_attachments(self, _session, _todo_id: int):
         return []
 
-    def _set_todo_tags(self, session, todo_id: int, tags):
+    def _set_todo_tags(self, _session, _todo_id: int, _tags):
         return None
 
 

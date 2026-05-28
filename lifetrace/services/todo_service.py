@@ -66,10 +66,10 @@ class TodoService:
         dtend = data.dtend or data.end_time
         due = data.due or data.deadline
         duration = data.duration
-        if duration and (due or dtend):
+        if duration and dtend:
             raise HTTPException(
                 status_code=400,
-                detail="duration 与 due/dtend 互斥，请只保留一个",
+                detail="duration 与 dtend 互斥，请只保留一个",
             )
 
         start_time = data.start_time or dtstart
@@ -205,17 +205,12 @@ class TodoService:
             kwargs["start_time"] = kwargs["deadline"]
 
         if "duration" in kwargs and kwargs["duration"] is not None:
-            if ("due" in kwargs and kwargs["due"] is not None) or (
-                "dtend" in kwargs and kwargs["dtend"] is not None
-            ):
+            if "dtend" in kwargs and kwargs["dtend"] is not None:
                 raise HTTPException(
                     status_code=400,
-                    detail="duration 与 due/dtend 互斥，请只保留一个",
+                    detail="duration 与 dtend 互斥，请只保留一个",
                 )
-            if item_type == "VTODO":
-                kwargs.setdefault("due", None)
-                kwargs.setdefault("deadline", None)
-            else:
+            if item_type != "VTODO":
                 kwargs.setdefault("dtend", None)
                 kwargs.setdefault("end_time", None)
 

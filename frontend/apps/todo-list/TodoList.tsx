@@ -20,6 +20,7 @@ import type { CreateTodoInput, Todo } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import type { TodoFilterState } from "./components/TodoFilter";
 import { useOrderedTodos } from "./hooks/useOrderedTodos";
+import { NaturalLanguageTodoModal } from "./NaturalLanguageTodoModal";
 import { NewTodoInlineForm } from "./NewTodoInlineForm";
 import { TodoToolbar } from "./TodoToolbar";
 import { TodoTreeList } from "./TodoTreeList";
@@ -45,6 +46,8 @@ export function TodoList() {
 
 	const [searchQuery, setSearchQuery] = useState("");
 	const [newTodoName, setNewTodoName] = useState("");
+	const [isNaturalLanguageModalOpen, setIsNaturalLanguageModalOpen] =
+		useState(false);
 	const [isCompletedCollapsed, setIsCompletedCollapsed] = useState(true);
 	const [filter, setFilter] = useState<TodoFilterState>({
 		status: "all",
@@ -340,6 +343,11 @@ export function TodoList() {
 				todos={todos}
 				filter={filter}
 				onFilterChange={setFilter}
+				onOpenNaturalLanguageAgent={() => setIsNaturalLanguageModalOpen(true)}
+			/>
+			<NaturalLanguageTodoModal
+				isOpen={isNaturalLanguageModalOpen}
+				onClose={() => setIsNaturalLanguageModalOpen(false)}
 			/>
 
 			<MultiTodoContextMenu selectedTodoIds={selectedTodoIds}>

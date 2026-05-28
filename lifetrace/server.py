@@ -27,7 +27,7 @@ setup_logging(logging_config)
 
 logger = get_logger()
 
-PRIORITY_MODULES = ("health", "config", "system", "todo")
+PRIORITY_MODULES = ("health", "config", "system", "todo", "agent")
 
 
 @asynccontextmanager

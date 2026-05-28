@@ -299,7 +299,7 @@ class JournalService:
         )
 
     def generate_objective(self, payload: JournalGenerateRequest) -> JournalGenerateResponse:
-        journal, date, _title, content_original, day_bucket_start = (
+        journal, date, _title, _content_original, day_bucket_start = (
             self._resolve_generation_context(payload)
         )
         start_time, end_time = self._resolve_day_bucket_range(date, day_bucket_start)

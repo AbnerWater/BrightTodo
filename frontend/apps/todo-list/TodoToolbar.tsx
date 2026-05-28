@@ -1,6 +1,6 @@
 "use client";
 
-import { ListTodo, Search } from "lucide-react";
+import { ListTodo, Search, Sparkles } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useEffect, useRef, useState } from "react";
 import {
@@ -19,6 +19,7 @@ interface TodoToolbarProps {
 	todos: Todo[];
 	filter: TodoFilterState;
 	onFilterChange: (filter: TodoFilterState) => void;
+	onOpenNaturalLanguageAgent: () => void;
 }
 
 export function TodoToolbar({
@@ -27,6 +28,7 @@ export function TodoToolbar({
 	todos,
 	filter,
 	onFilterChange,
+	onOpenNaturalLanguageAgent,
 }: TodoToolbarProps) {
 	const t = useTranslations("page");
 	const tTodoList = useTranslations("todoList");
@@ -66,6 +68,15 @@ export function TodoToolbar({
 			title={t("todoListTitle")}
 			actions={
 				<div className="flex items-center gap-2">
+					<PanelActionButton
+						variant="default"
+						icon={Sparkles}
+						onClick={onOpenNaturalLanguageAgent}
+						iconOverrides={{ color: "text-primary" }}
+						buttonOverrides={{ hoverTextColor: "hover:text-primary" }}
+						aria-label={tTodoList("agentOpen")}
+						title={tTodoList("agentOpen")}
+					/>
 					<TodoFilter
 						todos={todos}
 						filter={filter}

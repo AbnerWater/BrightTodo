@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from icalendar import Calendar
 
@@ -10,7 +10,7 @@ from lifetrace.services.icalendar_service import ICalendarService
 
 def test_export_vtodo_fallbacks_due_to_dtstart() -> None:
     service = ICalendarService()
-    dtstart = datetime(2024, 1, 1, 9, 30, tzinfo=timezone.utc)
+    dtstart = datetime(2024, 1, 1, 9, 30, tzinfo=UTC)
 
     ics = service.export_todos(
         [
@@ -31,21 +31,17 @@ def test_export_vtodo_fallbacks_due_to_dtstart() -> None:
 
 def test_import_vtodo_duration_keeps_due_none() -> None:
     service = ICalendarService()
-    ics = "\n".join(
-        [
-            "BEGIN:VCALENDAR",
-            "VERSION:2.0",
-            "PRODID:-//LifeTrace//FreeTodo//EN",
-            "BEGIN:VTODO",
-            "UID:todo-2",
-            "SUMMARY:Duration Task",
-            "DTSTART:20240102T090000Z",
-            "DURATION:PT30M",
-            "END:VTODO",
-            "END:VCALENDAR",
-            "",
-        ]
-    )
+    ics = """BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//LifeTrace//FreeTodo//EN
+BEGIN:VTODO
+UID:todo-2
+SUMMARY:Duration Task
+DTSTART:20240102T090000Z
+DURATION:PT30M
+END:VTODO
+END:VCALENDAR
+"""
 
     todos = service.import_todos(ics)
     assert len(todos) == 1
