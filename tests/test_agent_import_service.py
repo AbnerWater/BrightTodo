@@ -22,6 +22,34 @@ HTTP_BAD_REQUEST = 400
 HTTP_CONTENT_TOO_LARGE = 413
 EXPECTED_TEXT_TASK_COUNT = 2
 IMAGE_CONFIDENCE = 0.82
+DOCUMENT_FALLBACK_CONFIDENCE = 0.55
+LLM_TEMPERATURE = 0.2
+LLM_MAX_TOKENS = 1800
+
+
+class FakeUnavailableLlmClient:
+    def is_available(self) -> bool:
+        return False
+
+
+class FakeDocumentLlmClient:
+    def __init__(self, response_text: str) -> None:
+        self.response_text = response_text
+        self.messages: list[dict[str, str]] = []
+
+    def is_available(self) -> bool:
+        return True
+
+    def chat(
+        self,
+        messages: list[dict[str, str]],
+        temperature: float,
+        max_tokens: int,
+    ) -> str:
+        self.messages = messages
+        assert temperature == LLM_TEMPERATURE
+        assert max_tokens == LLM_MAX_TOKENS
+        return self.response_text
 
 
 class FakeTodoService:
@@ -54,8 +82,10 @@ def _reference_time() -> datetime:
     return datetime.fromisoformat("2026-05-19T10:00:00+08:00")
 
 
-def _service() -> AgentImportService:
-    return AgentImportService()
+def _service(document_llm_client=None) -> AgentImportService:
+    return AgentImportService(
+        document_llm_client=document_llm_client or FakeUnavailableLlmClient()
+    )
 
 
 def _txt_file(content: str, name: str = "tasks.txt") -> AgentImportFile:
@@ -93,6 +123,31 @@ def _build_pdf_bytes() -> bytes:
     page[NameObject("/Resources")] = resources
     content = DecodedStreamObject()
     content.set_data(b"BT /F1 12 Tf 10 120 Td (TODO finish report tomorrow) Tj ET")
+    page[NameObject("/Contents")] = writer._add_object(content)
+
+    buffer = BytesIO()
+    writer.write(buffer)
+    return buffer.getvalue()
+
+
+def _build_pdf_bytes_with_text(text: str) -> bytes:
+    writer = PdfWriter()
+    page = writer.add_blank_page(width=360, height=240)
+    font = DictionaryObject(
+        {
+            NameObject("/Type"): NameObject("/Font"),
+            NameObject("/Subtype"): NameObject("/Type1"),
+            NameObject("/BaseFont"): NameObject("/Helvetica"),
+        }
+    )
+    font_ref = writer._add_object(font)
+    resources = DictionaryObject(
+        {NameObject("/Font"): DictionaryObject({NameObject("/F1"): font_ref})}
+    )
+    page[NameObject("/Resources")] = resources
+    content = DecodedStreamObject()
+    escaped = text.replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)")
+    content.set_data(f"BT /F1 12 Tf 10 120 Td ({escaped}) Tj ET".encode("ascii"))
     page[NameObject("/Contents")] = writer._add_object(content)
 
     buffer = BytesIO()
@@ -161,6 +216,123 @@ def test_import_pdf_extracts_text_task() -> None:
     assert response.file_results[0].status == "success"
     assert response.extracted_tasks
     assert response.extracted_tasks[0].source_file == "tasks.pdf"
+
+
+def test_import_generic_pdf_uses_llm_to_infer_tasks() -> None:
+    fake_llm = FakeDocumentLlmClient(
+        """
+        {
+          "todos": [
+            {
+              "title": "准备课程项目展示",
+              "description": "根据项目说明整理展示材料",
+              "priority": "medium",
+              "due": null,
+              "duration": "PT2H",
+              "source_text": "Course project requires a group presentation and final report.",
+              "confidence": 0.83
+            }
+          ]
+        }
+        """
+    )
+
+    response = _service(fake_llm).import_files(
+        files=[
+            AgentImportFile(
+                file_name="syllabus.pdf",
+                mime_type="application/pdf",
+                content=_build_pdf_bytes_with_text(
+                    "Course project requires a group presentation and final report."
+                ),
+            )
+        ],
+        reference_time=_reference_time(),
+        create_todos=False,
+        todo_service=FakeTodoService(),
+    )
+
+    assert response.file_results[0].status == "success"
+    assert response.file_results[0].extracted_count == 1
+    assert response.extracted_tasks[0].task_title == "准备课程项目展示"
+    assert response.extracted_tasks[0].duration == "PT2H"
+    assert response.extracted_tasks[0].source_file_index == 0
+    assert "Course project requires" in fake_llm.messages[1]["content"]
+
+
+def test_import_llm_task_gets_initial_duration_when_missing() -> None:
+    fake_llm = FakeDocumentLlmClient(
+        """
+        {
+          "todos": [
+            {
+              "title": "阅读并整理论文要点",
+              "description": "整理为课堂讨论笔记",
+              "priority": "low",
+              "source_text": "Students will discuss the reading in class.",
+              "confidence": 0.76
+            }
+          ]
+        }
+        """
+    )
+
+    response = _service(fake_llm).import_files(
+        files=[_txt_file("Students will discuss the reading in class.")],
+        reference_time=_reference_time(),
+        create_todos=False,
+        todo_service=FakeTodoService(),
+    )
+
+    assert response.extracted_tasks[0].task_title == "阅读并整理论文要点"
+    assert response.extracted_tasks[0].duration == "PT1H"
+    assert response.extracted_tasks[0].priority == "low"
+
+
+def test_import_llm_empty_duration_falls_back_to_estimate() -> None:
+    fake_llm = FakeDocumentLlmClient(
+        """
+        {
+          "todos": [
+            {
+              "title": "准备课程项目报告",
+              "priority": "medium",
+              "duration": "PT",
+              "source_text": "Students should prepare a final project report.",
+              "confidence": 0.78
+            }
+          ]
+        }
+        """
+    )
+
+    response = _service(fake_llm).import_files(
+        files=[_txt_file("Students should prepare a final project report.")],
+        reference_time=_reference_time(),
+        create_todos=False,
+        todo_service=FakeTodoService(),
+    )
+
+    assert response.extracted_tasks[0].task_title == "准备课程项目报告"
+    assert response.extracted_tasks[0].duration == "PT2H"
+
+
+def test_import_generic_document_has_local_fallback_task_when_llm_unavailable() -> None:
+    response = _service().import_files(
+        files=[
+            _txt_file(
+                "Course project requires a group presentation and final report.",
+                name="course-project.txt",
+            )
+        ],
+        reference_time=_reference_time(),
+        create_todos=False,
+        todo_service=FakeTodoService(),
+    )
+
+    assert response.extracted_tasks[0].task_title == "准备项目展示和报告"
+    assert response.extracted_tasks[0].duration == "PT2H"
+    assert response.extracted_tasks[0].confidence == DOCUMENT_FALLBACK_CONFIDENCE
 
 
 def test_import_corrupted_pdf_returns_file_failure() -> None:
@@ -252,6 +424,18 @@ def test_import_create_todos_creates_draft_items() -> None:
     assert response.created_todos[0].name == "完成课程展示材料"
     assert fake_todo_service.created[0].status == TodoStatus.DRAFT
     assert fake_todo_service.created[0].tags == ["文件导入", "AI解析"]
+
+
+def test_rule_based_import_adds_initial_duration_estimate() -> None:
+    response = _service().import_files(
+        files=[_txt_file("后天回复导师邮件，紧急")],
+        reference_time=_reference_time(),
+        create_todos=False,
+        todo_service=FakeTodoService(),
+    )
+
+    assert response.extracted_tasks[0].task_title == "回复导师邮件"
+    assert response.extracted_tasks[0].duration == "PT30M"
 
 
 def test_import_create_todos_rolls_back_partial_success() -> None:
