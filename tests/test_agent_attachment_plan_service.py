@@ -2,11 +2,15 @@ from __future__ import annotations
 
 import os
 from datetime import datetime
+from io import BytesIO
 from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
 from fastapi import HTTPException
+from openpyxl import Workbook
+from pptx import Presentation
+from pptx.util import Inches
 
 from lifetrace.schemas.todo import TodoPriority, TodoStatus
 from lifetrace.services.agent_attachment_plan_service import (
@@ -153,6 +157,34 @@ def _txt_file(text: str, name: str = "course.txt") -> AgentImportFile:
     )
 
 
+def _xlsx_file() -> AgentImportFile:
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.title = "课程任务"
+    sheet.append(["Course project requires planning, implementation and report."])
+    buffer = BytesIO()
+    workbook.save(buffer)
+    return AgentImportFile(
+        file_name="course.xlsx",
+        mime_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        content=buffer.getvalue(),
+    )
+
+
+def _pptx_file() -> AgentImportFile:
+    presentation = Presentation()
+    slide = presentation.slides.add_slide(presentation.slide_layouts[6])
+    text_box = slide.shapes.add_textbox(Inches(1), Inches(1), Inches(6), Inches(1))
+    text_box.text = "Course project requires a group presentation and final report."
+    buffer = BytesIO()
+    presentation.save(buffer)
+    return AgentImportFile(
+        file_name="course.pptx",
+        mime_type="application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        content=buffer.getvalue(),
+    )
+
+
 def _plan_response() -> str:
     return """
     {
@@ -245,6 +277,54 @@ def test_attachment_plan_uses_llm_and_confirm_binds_source_attachment(
     assert fake_todo_service.attachments[0].file_name == "course.txt"
     assert Path(fake_todo_service.attachments[0].file_path).exists()
     assert not (tmp_path / "agent-plans" / response.plan_id).exists()
+
+
+def test_attachment_plan_accepts_excel_attachment(
+    tmp_path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        "lifetrace.services.agent_attachment_plan_service.get_attachments_dir",
+        lambda: tmp_path,
+    )
+    fake_llm = FakeTextLlmClient(_plan_response())
+    service = AgentAttachmentPlanService(llm_client=fake_llm)
+
+    response = service.create_plan(
+        files=[_xlsx_file()],
+        prompt="请根据 Excel 附件生成日程规划",
+        reference_time=_reference_time(),
+        planning_start=_reference_time(),
+        planning_end=None,
+        daily_available_hours=6,
+    )
+
+    assert response.file_results[0].status == "ready"
+    assert response.file_results[0].file_name == "course.xlsx"
+    assert "Course project requires" in fake_llm.messages[1]["content"]
+
+
+def test_attachment_plan_accepts_presentation_attachment(
+    tmp_path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        "lifetrace.services.agent_attachment_plan_service.get_attachments_dir",
+        lambda: tmp_path,
+    )
+    fake_llm = FakeTextLlmClient(_plan_response())
+    service = AgentAttachmentPlanService(llm_client=fake_llm)
+
+    response = service.create_plan(
+        files=[_pptx_file()],
+        prompt="请根据 PPT 附件生成日程规划",
+        reference_time=_reference_time(),
+        planning_start=_reference_time(),
+        planning_end=None,
+        daily_available_hours=6,
+    )
+
+    assert response.file_results[0].status == "ready"
+    assert response.file_results[0].file_name == "course.pptx"
+    assert "Course project requires" in fake_llm.messages[1]["content"]
 
 
 def test_confirm_plan_nested_mode_creates_parent_and_child_todos(

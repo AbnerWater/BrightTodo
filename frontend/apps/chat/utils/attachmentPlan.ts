@@ -46,8 +46,31 @@ export type AttachmentPlanConfirmResponse = {
 	}>;
 };
 
-export const SUPPORTED_IMPORT_ACCEPT =
-	".png,.jpg,.jpeg,.webp,.txt,.md,.markdown,.csv,.json,.pdf,.docx";
+export const SUPPORTED_IMPORT_ACCEPT = [
+	".png",
+	".jpg",
+	".jpeg",
+	".webp",
+	".txt",
+	".md",
+	".markdown",
+	".csv",
+	".json",
+	".pdf",
+	".docx",
+	".xlsx",
+	".xlsm",
+	".xltx",
+	".xltm",
+	".xls",
+	".pptx",
+	".pptm",
+	".ppsx",
+	".ppsm",
+	".potx",
+	".potm",
+	".ppt",
+].join(",");
 export const MAX_IMPORT_FILES = 5;
 export const MAX_IMPORT_FILE_BYTES = 10 * 1024 * 1024;
 

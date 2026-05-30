@@ -435,7 +435,7 @@
 			"uploadLabel": "添加图片或文件附件",
 			"uploading": "正在提交附件...",
 			"selectedFiles": "已选择文件",
-			"unsupportedHint": "附件会随下一次对话发送给 AI。支持 PNG/JPEG/WebP、TXT/MD/CSV/JSON、PDF、DOCX，单文件不超过 10MB，最多 5 个文件。",
+			"unsupportedHint": "附件会随下一次对话发送给 AI。支持 PNG/JPEG/WebP、TXT/MD/CSV/JSON、PDF、DOCX、Excel、PPT，单文件不超过 10MB，最多 5 个文件。",
 			"pendingTitle": "待确认日程规划",
 			"pendingDesc": "编辑后确认创建为草稿待办，并绑定来源附件。",
 			"pendingTextDesc": "编辑后确认创建为草稿待办。",

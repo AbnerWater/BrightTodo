@@ -6,6 +6,9 @@ from types import SimpleNamespace
 
 import pytest
 from docx import Document
+from openpyxl import Workbook
+from pptx import Presentation
+from pptx.util import Inches
 from pypdf import PdfWriter
 from pypdf.generic import DecodedStreamObject, DictionaryObject, NameObject
 
@@ -106,6 +109,32 @@ def _build_docx_bytes() -> bytes:
     return buffer.getvalue()
 
 
+def _build_xlsx_bytes() -> bytes:
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.title = "课程项目"
+    sheet.append(["事项", "说明"])
+    sheet.append(["明天下午三点前完成 Excel 数据整理", "大概需要两个小时，紧急"])
+    sheet.append(["后天准备课程项目展示 PPT", "整理演示材料"])
+    buffer = BytesIO()
+    workbook.save(buffer)
+    return buffer.getvalue()
+
+
+def _build_pptx_bytes() -> bytes:
+    presentation = Presentation()
+    slide = presentation.slides.add_slide(presentation.slide_layouts[6])
+    title_box = slide.shapes.add_textbox(Inches(1), Inches(1), Inches(6), Inches(1))
+    title_box.text = "明天完成项目汇报材料，大概需要两个小时"
+    table_shape = slide.shapes.add_table(1, 2, Inches(1), Inches(2), Inches(6), Inches(1))
+    table = table_shape.table
+    table.cell(0, 0).text = "后天回复导师修改意见"
+    table.cell(0, 1).text = "紧急"
+    buffer = BytesIO()
+    presentation.save(buffer)
+    return buffer.getvalue()
+
+
 def _build_pdf_bytes() -> bytes:
     writer = PdfWriter()
     page = writer.add_blank_page(width=240, height=240)
@@ -197,6 +226,46 @@ def test_import_docx_extracts_paragraph_and_table_tasks() -> None:
     assert "完成软件工程报告" in titles
     assert "回复导师邮件" in titles
     assert "完成软件工程报告" in response.raw_text_preview
+
+
+def test_import_xlsx_extracts_sheet_rows_as_tasks() -> None:
+    response = _service().import_files(
+        files=[
+            AgentImportFile(
+                file_name="course.xlsx",
+                mime_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                content=_build_xlsx_bytes(),
+            )
+        ],
+        reference_time=_reference_time(),
+        create_todos=False,
+        todo_service=FakeTodoService(),
+    )
+
+    titles = {task.task_title for task in response.extracted_tasks}
+    assert "完成 Excel 数据整理" in titles
+    assert "准备课程项目展示 PPT" in titles
+    assert "课程项目" in response.raw_text_preview
+
+
+def test_import_pptx_extracts_slide_text_and_table_tasks() -> None:
+    response = _service().import_files(
+        files=[
+            AgentImportFile(
+                file_name="course.pptx",
+                mime_type="application/vnd.openxmlformats-officedocument.presentationml.presentation",
+                content=_build_pptx_bytes(),
+            )
+        ],
+        reference_time=_reference_time(),
+        create_todos=False,
+        todo_service=FakeTodoService(),
+    )
+
+    titles = {task.task_title for task in response.extracted_tasks}
+    assert "完成项目汇报材料" in titles
+    assert "回复导师修改意见" in titles
+    assert "幻灯片 1" in response.raw_text_preview
 
 
 def test_import_pdf_extracts_text_task() -> None:
@@ -370,6 +439,44 @@ def test_import_corrupted_docx_returns_file_failure() -> None:
 
     assert response.file_results[0].status == "failed"
     assert response.file_results[0].error_code == "DOCX_PARSE_FAILED"
+    assert response.extracted_tasks == []
+
+
+def test_import_corrupted_spreadsheet_returns_file_failure() -> None:
+    response = _service().import_files(
+        files=[
+            AgentImportFile(
+                file_name="broken.xlsx",
+                mime_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                content=b"not an excel file",
+            )
+        ],
+        reference_time=_reference_time(),
+        create_todos=False,
+        todo_service=FakeTodoService(),
+    )
+
+    assert response.file_results[0].status == "failed"
+    assert response.file_results[0].error_code == "SPREADSHEET_PARSE_FAILED"
+    assert response.extracted_tasks == []
+
+
+def test_import_corrupted_presentation_returns_file_failure() -> None:
+    response = _service().import_files(
+        files=[
+            AgentImportFile(
+                file_name="broken.pptx",
+                mime_type="application/vnd.openxmlformats-officedocument.presentationml.presentation",
+                content=b"not a pptx file",
+            )
+        ],
+        reference_time=_reference_time(),
+        create_todos=False,
+        todo_service=FakeTodoService(),
+    )
+
+    assert response.file_results[0].status == "failed"
+    assert response.file_results[0].error_code == "PRESENTATION_PARSE_FAILED"
     assert response.extracted_tasks == []
 
 

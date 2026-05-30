@@ -435,7 +435,7 @@
 			"uploadLabel": "Attach images or files",
 			"uploading": "Submitting attachments...",
 			"selectedFiles": "Selected files",
-			"unsupportedHint": "Attachments will be sent with the next AI request. Supports PNG/JPEG/WebP, TXT/MD/CSV/JSON, PDF, DOCX. Max 10MB per file and 5 files.",
+			"unsupportedHint": "Attachments will be sent with the next AI request. Supports PNG/JPEG/WebP, TXT/MD/CSV/JSON, PDF, DOCX, Excel, and PPT. Max 10MB per file and 5 files.",
 			"pendingTitle": "Schedule plan to confirm",
 			"pendingDesc": "Edit and confirm to create draft todos with source attachments.",
 			"pendingTextDesc": "Edit and confirm to create draft todos.",

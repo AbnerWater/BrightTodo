@@ -512,7 +512,10 @@ class AgentAttachmentPlanService:
                 raise AttachmentPlanError(
                     400,
                     "INVALID_FILE_TYPE",
-                    "仅支持 PNG/JPEG/WebP、TXT/MD/CSV/JSON、PDF、DOCX 文件",
+                    (
+                        "仅支持 PNG/JPEG/WebP、TXT/MD/CSV/JSON、PDF、DOCX、"
+                        "XLS/XLSX、PPT/PPTX 文件"
+                    ),
                     file.file_name,
                 )
 

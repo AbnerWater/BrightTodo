@@ -38,8 +38,12 @@ MAX_LLM_TODO_COUNT = 12
 MAX_PREVIEW_CHARS = 1200
 MAX_SOURCE_TEXT_CHARS = 240
 MIN_TASK_TEXT_CHARS = 2
+MIN_LEGACY_PPT_TEXT_CHARS = 4
+MAX_SPREADSHEET_ROWS = 200
+MAX_SPREADSHEET_COLUMNS = 30
+MAX_PRESENTATION_SLIDES = 80
 
-FileKind = Literal["image", "text", "pdf", "docx"]
+FileKind = Literal["image", "text", "pdf", "docx", "spreadsheet", "presentation"]
 
 IMAGE_MIME_TYPES = {"image/png", "image/jpeg", "image/webp"}
 IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp"}
@@ -49,6 +53,22 @@ TEXT_MIME_TYPES = {"application/json", "application/x-ndjson"}
 PDF_MIME_TYPES = {"application/pdf"}
 DOCX_MIME_TYPES = {
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+}
+SPREADSHEET_EXTENSIONS = {".xlsx", ".xlsm", ".xltx", ".xltm", ".xls"}
+SPREADSHEET_MIME_TYPES = {
+    "application/vnd.ms-excel",
+    "application/vnd.ms-excel.sheet.macroenabled.12",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.template",
+}
+PRESENTATION_EXTENSIONS = {".ppt", ".pptx", ".pptm", ".ppsx", ".ppsm", ".potx", ".potm"}
+PRESENTATION_MIME_TYPES = {
+    "application/vnd.ms-powerpoint",
+    "application/vnd.ms-powerpoint.presentation.macroenabled.12",
+    "application/vnd.ms-powerpoint.slideshow.macroenabled.12",
+    "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    "application/vnd.openxmlformats-officedocument.presentationml.slideshow",
+    "application/vnd.openxmlformats-officedocument.presentationml.template",
 }
 
 TASK_HINT_RE = re.compile(
@@ -173,7 +193,10 @@ class AgentImportService:
                 raise ImportTodosError(
                     400,
                     "INVALID_FILE_TYPE",
-                    "仅支持 PNG/JPEG/WebP、TXT/MD/CSV/JSON、PDF、DOCX 文件",
+                    (
+                        "仅支持 PNG/JPEG/WebP、TXT/MD/CSV/JSON、PDF、DOCX、"
+                        "XLS/XLSX、PPT/PPTX 文件"
+                    ),
                     file.file_name,
                 )
 
@@ -283,6 +306,10 @@ class AgentImportService:
             return self._extract_pdf_text(file.content)
         if kind == "docx":
             return self._extract_docx_text(file.content)
+        if kind == "spreadsheet":
+            return self._extract_spreadsheet_text(file.content, file.file_name)
+        if kind == "presentation":
+            return self._extract_presentation_text(file.content, file.file_name)
         return self._decode_text(file.content)
 
     def _extract_pdf_text(self, content: bytes) -> str:
@@ -323,6 +350,174 @@ class AgentImportService:
                 if cells:
                     parts.append(" | ".join(cells))
         return "\n".join(parts)
+
+    def _extract_spreadsheet_text(self, content: bytes, file_name: str) -> str:
+        suffix = Path(file_name).suffix.lower()
+        if suffix == ".xls":
+            return self._extract_xls_text(content)
+        return self._extract_xlsx_text(content)
+
+    def _extract_xlsx_text(self, content: bytes) -> str:
+        try:
+            from openpyxl import load_workbook  # noqa: PLC0415
+        except ImportError as exc:
+            raise ImportTodosError(
+                500,
+                "SPREADSHEET_SUPPORT_MISSING",
+                "Excel 解析依赖未安装",
+            ) from exc
+
+        try:
+            workbook = load_workbook(io.BytesIO(content), read_only=True, data_only=True)
+        except Exception as exc:
+            raise FileParseError(
+                "SPREADSHEET_PARSE_FAILED",
+                "Excel 文件解析失败，请确认文件未损坏",
+                str(exc),
+            ) from exc
+
+        try:
+            return self._workbook_to_text(workbook.worksheets)
+        finally:
+            workbook.close()
+
+    def _extract_xls_text(self, content: bytes) -> str:
+        try:
+            import xlrd  # noqa: PLC0415
+        except ImportError as exc:
+            raise ImportTodosError(
+                500,
+                "SPREADSHEET_SUPPORT_MISSING",
+                "Excel 解析依赖未安装",
+            ) from exc
+
+        try:
+            workbook = xlrd.open_workbook(file_contents=content)
+        except Exception as exc:
+            raise FileParseError(
+                "SPREADSHEET_PARSE_FAILED",
+                "Excel 文件解析失败，请确认文件未损坏",
+                str(exc),
+            ) from exc
+
+        parts: list[str] = []
+        for sheet in workbook.sheets():
+            parts.extend(self._xls_sheet_to_lines(sheet.name, sheet))
+        return "\n".join(parts)
+
+    def _workbook_to_text(self, sheets: Any) -> str:
+        parts: list[str] = []
+        for sheet in sheets:
+            parts.append(f"[工作表] {sheet.title}")
+            row_count = 0
+            for row in sheet.iter_rows(values_only=True):
+                cells = [self._format_cell_value(value) for value in row[:MAX_SPREADSHEET_COLUMNS]]
+                line = "，".join(cell for cell in cells if cell)
+                if not line:
+                    continue
+                parts.append(line)
+                row_count += 1
+                if row_count >= MAX_SPREADSHEET_ROWS:
+                    parts.append("[后续行已截断]")
+                    break
+        return "\n".join(parts)
+
+    def _xls_sheet_to_lines(self, sheet_name: str, sheet: Any) -> list[str]:
+        lines = [f"[工作表] {sheet_name}"]
+        row_limit = min(sheet.nrows, MAX_SPREADSHEET_ROWS)
+        col_limit = min(sheet.ncols, MAX_SPREADSHEET_COLUMNS)
+        for row_index in range(row_limit):
+            cells = [
+                self._format_cell_value(sheet.cell_value(row_index, col_index))
+                for col_index in range(col_limit)
+            ]
+            line = "，".join(cell for cell in cells if cell)
+            if line:
+                lines.append(line)
+        if sheet.nrows > MAX_SPREADSHEET_ROWS:
+            lines.append("[后续行已截断]")
+        return lines
+
+    def _format_cell_value(self, value: object) -> str:
+        if value is None:
+            return ""
+        if isinstance(value, float) and value.is_integer():
+            return str(int(value))
+        return str(value).strip()
+
+    def _extract_presentation_text(self, content: bytes, file_name: str) -> str:
+        if Path(file_name).suffix.lower() == ".ppt":
+            return self._extract_legacy_ppt_text(content)
+
+        try:
+            from pptx import Presentation  # noqa: PLC0415
+        except ImportError as exc:
+            raise ImportTodosError(
+                500,
+                "PRESENTATION_SUPPORT_MISSING",
+                "PPT 解析依赖未安装",
+            ) from exc
+
+        try:
+            presentation = Presentation(io.BytesIO(content))
+        except Exception as exc:
+            raise FileParseError(
+                "PRESENTATION_PARSE_FAILED",
+                "PPT 文件解析失败，请确认文件未损坏",
+                str(exc),
+            ) from exc
+
+        parts: list[str] = []
+        for slide_index, slide in enumerate(presentation.slides, start=1):
+            if slide_index > MAX_PRESENTATION_SLIDES:
+                parts.append("[后续幻灯片已截断]")
+                break
+            slide_parts = self._slide_to_text_parts(slide.shapes)
+            if slide_parts:
+                parts.append(f"[幻灯片 {slide_index}]")
+                parts.extend(slide_parts)
+        return "\n".join(parts)
+
+    def _slide_to_text_parts(self, shapes: Any) -> list[str]:
+        parts: list[str] = []
+        for shape in shapes:
+            if getattr(shape, "has_text_frame", False):
+                text = str(getattr(shape, "text", "") or "").strip()
+                if text:
+                    parts.append(text)
+            if getattr(shape, "has_table", False):
+                for row in shape.table.rows:
+                    cells = [cell.text.strip() for cell in row.cells if cell.text.strip()]
+                    if cells:
+                        parts.append("，".join(cells))
+            if hasattr(shape, "shapes"):
+                parts.extend(self._slide_to_text_parts(shape.shapes))
+        return parts
+
+    def _extract_legacy_ppt_text(self, content: bytes) -> str:
+        """对旧版二进制 PPT 做尽力文本抽取，建议用户另存为 PPTX 可获得更好效果。"""
+        candidates = [
+            content.decode("utf-16le", errors="ignore"),
+            content.decode("latin-1", errors="ignore"),
+        ]
+        parts: list[str] = []
+        seen: set[str] = set()
+        for candidate in candidates:
+            for match in re.findall(
+                r"[\u4e00-\u9fffA-Za-z0-9][\u4e00-\u9fffA-Za-z0-9\s，。；、:：,.!?！？()（）/_-]{3,}",
+                candidate,
+            ):
+                text = re.sub(r"\s+", " ", match).strip(" \x00")
+                if len(text) < MIN_LEGACY_PPT_TEXT_CHARS or text in seen:
+                    continue
+                seen.add(text)
+                parts.append(text)
+        if not parts:
+            raise FileParseError(
+                "PRESENTATION_PARSE_FAILED",
+                "PPT 文件解析失败，请确认文件未损坏或另存为 PPTX 后重试",
+            )
+        return "\n".join(parts[:MAX_SPREADSHEET_ROWS])
 
     def _decode_text(self, content: bytes) -> str:
         for encoding in ("utf-8-sig", "utf-8", "gb18030"):
@@ -822,15 +1017,24 @@ class AgentImportService:
     def _detect_file_kind(self, file: AgentImportFile) -> FileKind | None:
         suffix = Path(file.file_name).suffix.lower()
         mime_type = (file.mime_type or "").lower()
+        kind: FileKind | None = None
         if suffix in IMAGE_EXTENSIONS or mime_type in IMAGE_MIME_TYPES:
-            return "image"
-        if suffix in TEXT_EXTENSIONS or mime_type.startswith(TEXT_MIME_PREFIXES) or mime_type in TEXT_MIME_TYPES:
-            return "text"
-        if suffix == ".pdf" or mime_type in PDF_MIME_TYPES:
-            return "pdf"
-        if suffix == ".docx" or mime_type in DOCX_MIME_TYPES:
-            return "docx"
-        return None
+            kind = "image"
+        elif (
+            suffix in TEXT_EXTENSIONS
+            or mime_type.startswith(TEXT_MIME_PREFIXES)
+            or mime_type in TEXT_MIME_TYPES
+        ):
+            kind = "text"
+        elif suffix == ".pdf" or mime_type in PDF_MIME_TYPES:
+            kind = "pdf"
+        elif suffix == ".docx" or mime_type in DOCX_MIME_TYPES:
+            kind = "docx"
+        elif suffix in SPREADSHEET_EXTENSIONS or mime_type in SPREADSHEET_MIME_TYPES:
+            kind = "spreadsheet"
+        elif suffix in PRESENTATION_EXTENSIONS or mime_type in PRESENTATION_MIME_TYPES:
+            kind = "presentation"
+        return kind
 
     def _to_image_data_url(self, file: AgentImportFile) -> str:
         mime_type = file.mime_type or self._mime_from_extension(file.file_name)
