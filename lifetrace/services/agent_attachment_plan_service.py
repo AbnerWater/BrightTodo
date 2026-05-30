@@ -53,6 +53,8 @@ MAX_PLAN_TODO_COUNT = 12
 DEFAULT_DAILY_AVAILABLE_HOURS = 6
 DEFAULT_CONFIDENCE = 0.7
 PLAN_TTL_SECONDS = 24 * 60 * 60
+DEFAULT_VISION_MODEL = "qwen3-vl-plus"
+DASHSCOPE_BASE_URL_MARKER = "dashscope.aliyuncs.com"
 ISO_DURATION_RE = re.compile(
     r"^P(?:(?:\d+(?:\.\d+)?D)?"
     r"(?:T(?:\d+(?:\.\d+)?H)?(?:\d+(?:\.\d+)?M)?(?:\d+(?:\.\d+)?S)?)?)$"
@@ -153,7 +155,7 @@ class AgentAttachmentPlanService:
                 raise AttachmentPlanError(
                     502,
                     "LLM_REQUEST_FAILED",
-                    "LLM 附件规划请求失败，请检查 AI 服务配置",
+                    self._build_llm_failure_message(exc),
                     str(exc),
                 ) from exc
             proposed_todos, summary = self._parse_plan_response(response_text, stored_files)
@@ -393,7 +395,7 @@ class AgentAttachmentPlanService:
             )
             client = llm_client._get_client()
             response = client.chat.completions.create(
-                model=settings.llm.vision_model or llm_client.model,
+                model=self._resolve_attachment_vision_model(llm_client),
                 messages=messages,
                 temperature=0.2,
                 max_tokens=2600,
@@ -419,6 +421,42 @@ class AgentAttachmentPlanService:
             extra_body={"enable_thinking": False},
         )
         return response.choices[0].message.content or ""
+
+    def _resolve_attachment_vision_model(self, llm_client: Any) -> str:
+        """选择附件规划图片请求使用的模型。"""
+        primary_model = str(getattr(llm_client, "model", "") or settings.llm.model or "").strip()
+        vision_model = str(settings.llm.vision_model or "").strip()
+        base_url = str(settings.llm.base_url or "").lower()
+
+        if not vision_model:
+            return primary_model
+
+        if (
+            vision_model == DEFAULT_VISION_MODEL
+            and primary_model
+            and DASHSCOPE_BASE_URL_MARKER not in base_url
+        ):
+            logger.info(
+                "附件规划检测到默认视觉模型与当前 LLM 服务不匹配，改用主模型: "
+                f"{primary_model}"
+            )
+            return primary_model
+
+        return vision_model
+
+    def _build_llm_failure_message(self, exc: Exception) -> str:
+        """把常见 LLM 供应商错误转换为用户可操作的提示。"""
+        detail = str(exc)
+        lower_detail = detail.lower()
+
+        if "invalid_api_key" in lower_detail or "incorrect api key" in lower_detail:
+            return "AI API Key 无效，请检查 AI 服务配置"
+        if "settlement_unknown_model" in lower_detail or "settlement blocked" in lower_detail:
+            return "当前 AI 服务不支持所选模型，请检查主模型/视觉模型配置"
+        if "service temporarily unavailable" in lower_detail or "算力池" in detail:
+            return "AI 服务暂时不可用，请稍后重试或切换可用模型"
+
+        return "LLM 附件规划请求失败，请检查 AI 服务配置"
 
     def _build_plan_prompts(
         self,

@@ -14,6 +14,7 @@ from lifetrace.services.agent_attachment_plan_service import (
     AttachmentPlanError,
 )
 from lifetrace.services.agent_import_service import AgentImportFile
+from lifetrace.util.settings import settings
 
 HTTP_SERVICE_UNAVAILABLE = 503
 HTTP_BAD_REQUEST = 400
@@ -43,12 +44,15 @@ class FakeTextLlmClient:
 
 
 class FakeFailingLlmClient:
+    def __init__(self, message: str = "invalid api key") -> None:
+        self.message = message
+
     def is_available(self) -> bool:
         return True
 
     def chat(self, messages, temperature: float, max_tokens: int) -> str:
         _ = messages, temperature, max_tokens
-        raise RuntimeError("invalid api key")
+        raise RuntimeError(self.message)
 
 
 class FakeVisionCompletions:
@@ -332,6 +336,30 @@ def test_attachment_plan_wraps_llm_request_failure(tmp_path, monkeypatch) -> Non
     assert not plans_dir.exists() or not any(plans_dir.iterdir())
 
 
+def test_attachment_plan_reports_temporary_llm_service_failure(
+    tmp_path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        "lifetrace.services.agent_attachment_plan_service.get_attachments_dir",
+        lambda: tmp_path,
+    )
+    service = AgentAttachmentPlanService(
+        llm_client=FakeFailingLlmClient("Service temporarily unavailable")
+    )
+
+    with pytest.raises(AttachmentPlanError) as exc_info:
+        service.create_plan(
+            files=[_txt_file("课程要求完成展示。")],
+            prompt="请生成规划",
+            reference_time=_reference_time(),
+            planning_start=None,
+            planning_end=None,
+            daily_available_hours=None,
+        )
+
+    assert exc_info.value.message == "AI 服务暂时不可用，请稍后重试或切换可用模型"
+
+
 def test_attachment_plan_rejects_empty_prompt(tmp_path, monkeypatch) -> None:
     monkeypatch.setattr(
         "lifetrace.services.agent_attachment_plan_service.get_attachments_dir",
@@ -382,3 +410,67 @@ def test_attachment_plan_sends_images_as_multimodal_content(
     user_content = messages[1]["content"]
     assert any(item.get("type") == "image_url" for item in user_content)
     assert response.proposed_todos[0].source_files == ["board.png"]
+
+
+def test_attachment_plan_uses_primary_model_for_default_vision_model_on_other_provider(
+    tmp_path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        "lifetrace.services.agent_attachment_plan_service.get_attachments_dir",
+        lambda: tmp_path,
+    )
+    monkeypatch.setattr(settings.llm, "base_url", "https://api.example.com/v1")
+    monkeypatch.setattr(settings.llm, "model", "gpt-5.5")
+    monkeypatch.setattr(settings.llm, "vision_model", "qwen3-vl-plus")
+    fake_llm = FakeVisionLlmClient(_plan_response())
+    fake_llm.model = "gpt-5.5"
+    service = AgentAttachmentPlanService(llm_client=fake_llm)
+
+    service.create_plan(
+        files=[
+            AgentImportFile(
+                file_name="board.png",
+                mime_type="image/png",
+                content=b"\x89PNG\r\n\x1a\n",
+            )
+        ],
+        prompt="请根据图片生成日程规划",
+        reference_time=_reference_time(),
+        planning_start=None,
+        planning_end=None,
+        daily_available_hours=None,
+    )
+
+    assert fake_llm.kwargs["model"] == "gpt-5.5"
+
+
+def test_attachment_plan_respects_explicit_vision_model(
+    tmp_path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        "lifetrace.services.agent_attachment_plan_service.get_attachments_dir",
+        lambda: tmp_path,
+    )
+    monkeypatch.setattr(settings.llm, "base_url", "https://api.example.com/v1")
+    monkeypatch.setattr(settings.llm, "model", "gpt-5.5")
+    monkeypatch.setattr(settings.llm, "vision_model", "custom-vision-model")
+    fake_llm = FakeVisionLlmClient(_plan_response())
+    fake_llm.model = "gpt-5.5"
+    service = AgentAttachmentPlanService(llm_client=fake_llm)
+
+    service.create_plan(
+        files=[
+            AgentImportFile(
+                file_name="board.png",
+                mime_type="image/png",
+                content=b"\x89PNG\r\n\x1a\n",
+            )
+        ],
+        prompt="请根据图片生成日程规划",
+        reference_time=_reference_time(),
+        planning_start=None,
+        planning_end=None,
+        daily_available_hours=None,
+    )
+
+    assert fake_llm.kwargs["model"] == "custom-vision-model"
