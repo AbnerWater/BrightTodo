@@ -11,9 +11,16 @@ from lifetrace.core.dependencies import get_todo_service
 from lifetrace.schemas.agent import (
     AgentParseTaskRequest,
     AgentParseTaskResponse,
+    AttachmentPlanConfirmRequest,
+    AttachmentPlanConfirmResponse,
+    AttachmentPlanResponse,
     ImportTodosResponse,
     ScheduleSuggestRequest,
     ScheduleSuggestResponse,
+)
+from lifetrace.services.agent_attachment_plan_service import (
+    AgentAttachmentPlanService,
+    AttachmentPlanError,
 )
 from lifetrace.services.agent_import_service import (
     MAX_IMPORT_FILE_BYTES,
@@ -131,3 +138,62 @@ async def import_todos(
         )
     except ImportTodosError as exc:
         return _error_response(exc.status_code, exc.error_code, exc.message, exc.detail)
+
+
+@router.post("/attachment-plan", response_model=AttachmentPlanResponse)
+async def create_attachment_plan(
+    files: list[UploadFile] = File(..., description="作为下一次对话附件提交的文件列表"),
+    prompt: str = Form(..., description="用户确认后的规划 prompt"),
+    reference_time: datetime | None = Form(None, description="相对时间解析基准"),
+    conversation_id: str | None = Form(None, description="聊天会话 ID"),
+    planning_start: datetime | None = Form(None, description="编排开始时间"),
+    planning_end: datetime | None = Form(None, description="编排结束时间"),
+    daily_available_hours: int | None = Form(None, description="每日可用学习时长"),
+):
+    """基于附件和用户确认 prompt 生成待确认日程规划。"""
+    _ = conversation_id
+    service = AgentAttachmentPlanService()
+    try:
+        import_files = await _read_import_files(files)
+        return service.create_plan(
+            files=import_files,
+            prompt=prompt,
+            reference_time=reference_time,
+            planning_start=planning_start,
+            planning_end=planning_end,
+            daily_available_hours=daily_available_hours,
+        )
+    except (AttachmentPlanError, ImportTodosError) as exc:
+        return _error_response(exc.status_code, exc.error_code, exc.message, exc.detail)
+
+
+@router.post(
+    "/attachment-plan/{plan_id}/confirm",
+    response_model=AttachmentPlanConfirmResponse,
+)
+async def confirm_attachment_plan(
+    plan_id: str,
+    request: AttachmentPlanConfirmRequest,
+    todo_service: TodoService = Depends(get_todo_service),
+):
+    """确认附件规划并创建草稿待办，同时绑定来源附件。"""
+    service = AgentAttachmentPlanService()
+    try:
+        return service.confirm_plan(
+            plan_id=plan_id,
+            proposed_todos=request.proposed_todos,
+            todo_service=todo_service,
+        )
+    except AttachmentPlanError as exc:
+        return _error_response(exc.status_code, exc.error_code, exc.message, exc.detail)
+
+
+@router.delete("/attachment-plan/{plan_id}", status_code=204)
+async def delete_attachment_plan(plan_id: str):
+    """放弃附件规划并清理临时文件。"""
+    service = AgentAttachmentPlanService()
+    try:
+        service.delete_plan(plan_id)
+    except AttachmentPlanError as exc:
+        return _error_response(exc.status_code, exc.error_code, exc.message, exc.detail)
+    return None

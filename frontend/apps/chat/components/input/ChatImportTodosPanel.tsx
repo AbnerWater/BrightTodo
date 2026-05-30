@@ -18,34 +18,41 @@ export type UploadFileItem = {
 	name: string;
 	type: string;
 	size: number;
-	status: "ready" | "processing" | "processed" | "failed";
+	status: "ready" | "planning" | "planned" | "failed";
 	message?: string;
 	previewUrl?: string;
+	sourceIndex?: number;
+	file: File;
 };
 
-export type ImportTodoDraft = {
+export type AttachmentPlanDraft = {
 	id: string;
-	taskTitle: string;
+	planItemId: string;
+	title: string;
 	priority: TodoPriority;
 	due: string | null;
 	duration: string | null;
 	description: string | null;
-	sourceFile: string;
-	sourceFileId: string;
-	sourceText: string;
+	suggestedStart: string | null;
+	suggestedEnd: string | null;
+	scheduleReason: string | null;
+	sourceFileIndices: number[];
+	sourceFiles: string[];
+	sourceText: string | null;
 	confidence: number;
 };
 
 type ChatImportTodosPanelProps = {
 	files: UploadFileItem[];
-	tasks: ImportTodoDraft[];
-	isUploading: boolean;
+	planItems: AttachmentPlanDraft[];
+	isPlanning: boolean;
 	isCreating: boolean;
 	successMessage: string | null;
 	errorMessage: string | null;
+	scheduleSummary: string | null;
 	onRemoveFile: (fileId: string) => void;
-	onRemoveTask: (taskId: string) => void;
-	onUpdateTask: (taskId: string, patch: Partial<ImportTodoDraft>) => void;
+	onRemovePlanItem: (itemId: string) => void;
+	onUpdatePlanItem: (itemId: string, patch: Partial<AttachmentPlanDraft>) => void;
 	onConfirmCreate: () => void;
 	onClearAll: () => void;
 };
@@ -73,10 +80,10 @@ const fromDateTimeLocalValue = (value: string) => {
 };
 
 function FileStatusIcon({ file }: { file: UploadFileItem }) {
-	if (file.status === "processing") {
+	if (file.status === "planning") {
 		return <Loader2 className="h-4 w-4 animate-spin text-primary" />;
 	}
-	if (file.status === "processed") {
+	if (file.status === "planned") {
 		return <Check className="h-4 w-4 text-emerald-600" />;
 	}
 	if (file.type.startsWith("image/")) {
@@ -87,20 +94,26 @@ function FileStatusIcon({ file }: { file: UploadFileItem }) {
 
 export function ChatImportTodosPanel({
 	files,
-	tasks,
-	isUploading,
+	planItems,
+	isPlanning,
 	isCreating,
 	successMessage,
 	errorMessage,
+	scheduleSummary,
 	onRemoveFile,
-	onRemoveTask,
-	onUpdateTask,
+	onRemovePlanItem,
+	onUpdatePlanItem,
 	onConfirmCreate,
 	onClearAll,
 }: ChatImportTodosPanelProps) {
 	const t = useTranslations("chat.importTodos");
 	const tPriority = useTranslations("common.priority");
-	const hasContent = files.length > 0 || tasks.length > 0 || errorMessage || successMessage;
+	const hasContent =
+		files.length > 0 ||
+		planItems.length > 0 ||
+		errorMessage ||
+		successMessage ||
+		scheduleSummary;
 
 	if (!hasContent) return null;
 
@@ -109,10 +122,10 @@ export function ChatImportTodosPanel({
 			<div className="flex items-start justify-between gap-3">
 				<div>
 					<p className="text-sm font-medium text-foreground">
-						{tasks.length > 0 ? t("pendingTitle") : t("selectedFiles")}
+						{planItems.length > 0 ? t("pendingTitle") : t("selectedFiles")}
 					</p>
 					<p className="mt-0.5 text-xs text-muted-foreground">
-						{tasks.length > 0 ? t("pendingDesc") : t("unsupportedHint")}
+						{planItems.length > 0 ? t("pendingDesc") : t("unsupportedHint")}
 					</p>
 				</div>
 				<button
@@ -161,7 +174,8 @@ export function ChatImportTodosPanel({
 							<button
 								type="button"
 								onClick={() => onRemoveFile(file.id)}
-								className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-foreground/5"
+								disabled={isPlanning || isCreating}
+								className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-foreground/5 disabled:cursor-not-allowed disabled:opacity-50"
 								aria-label={t("removeFile")}
 							>
 								<X className="h-4 w-4" />
@@ -171,26 +185,32 @@ export function ChatImportTodosPanel({
 				</div>
 			)}
 
-			{isUploading && (
+			{isPlanning && (
 				<div className="overflow-hidden rounded-full bg-muted">
 					<div className="h-1 w-1/2 animate-pulse rounded-full bg-primary" />
 				</div>
 			)}
 
-			{tasks.length > 0 && (
-				<div className="max-h-72 space-y-2 overflow-y-auto pr-1">
-					{tasks.map((task) => (
+			{scheduleSummary && (
+				<p className="rounded-md bg-muted/40 px-2 py-1.5 text-xs text-muted-foreground">
+					{scheduleSummary}
+				</p>
+			)}
+
+			{planItems.length > 0 && (
+				<div className="max-h-96 space-y-2 overflow-y-auto pr-1">
+					{planItems.map((item) => (
 						<div
-							key={task.id}
+							key={item.id}
 							className="grid gap-2 rounded-md border border-border bg-background p-2"
 						>
 							<div className="flex items-start gap-2">
 								<label className="min-w-0 flex-1">
 									<span className="sr-only">{t("taskTitleLabel")}</span>
 									<input
-										value={task.taskTitle}
+										value={item.title}
 										onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
-											onUpdateTask(task.id, { taskTitle: event.target.value })
+											onUpdatePlanItem(item.id, { title: event.target.value })
 										}
 										placeholder={t("taskTitlePlaceholder")}
 										className="h-8 w-full rounded-md border border-input bg-background px-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
@@ -198,23 +218,23 @@ export function ChatImportTodosPanel({
 								</label>
 								<button
 									type="button"
-									onClick={() => onRemoveTask(task.id)}
+									onClick={() => onRemovePlanItem(item.id)}
 									className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-foreground/5"
 									aria-label={t("removeTask")}
 								>
 									<Trash2 className="h-4 w-4" />
 								</button>
 							</div>
-							<div className="grid gap-2 sm:grid-cols-2">
+							<div className="grid gap-2 sm:grid-cols-3">
 								<label className="min-w-0">
 									<span className="mb-1 block text-[11px] text-muted-foreground">
 										{t("dueLabel")}
 									</span>
 									<input
 										type="datetime-local"
-										value={toDateTimeLocalValue(task.due)}
+										value={toDateTimeLocalValue(item.due)}
 										onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
-											onUpdateTask(task.id, {
+											onUpdatePlanItem(item.id, {
 												due: fromDateTimeLocalValue(event.target.value),
 											})
 										}
@@ -226,9 +246,9 @@ export function ChatImportTodosPanel({
 										{t("priorityLabel")}
 									</span>
 									<select
-										value={task.priority}
+										value={item.priority}
 										onChange={(event: React.ChangeEvent<HTMLSelectElement>) =>
-											onUpdateTask(task.id, {
+											onUpdatePlanItem(item.id, {
 												priority: event.target.value as TodoPriority,
 											})
 										}
@@ -241,10 +261,82 @@ export function ChatImportTodosPanel({
 										))}
 									</select>
 								</label>
+								<label>
+									<span className="mb-1 block text-[11px] text-muted-foreground">
+										{t("durationLabel")}
+									</span>
+									<input
+										value={item.duration ?? ""}
+										onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
+											onUpdatePlanItem(item.id, {
+												duration: event.target.value || null,
+											})
+										}
+										placeholder="PT1H"
+										className="h-8 w-full rounded-md border border-input bg-background px-2 text-xs outline-none focus-visible:ring-2 focus-visible:ring-ring"
+									/>
+								</label>
 							</div>
+							<div className="grid gap-2 sm:grid-cols-2">
+								<label className="min-w-0">
+									<span className="mb-1 block text-[11px] text-muted-foreground">
+										{t("suggestedStartLabel")}
+									</span>
+									<input
+										type="datetime-local"
+										value={toDateTimeLocalValue(item.suggestedStart)}
+										onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
+											onUpdatePlanItem(item.id, {
+												suggestedStart: fromDateTimeLocalValue(
+													event.target.value,
+												),
+											})
+										}
+										className="h-8 w-full rounded-md border border-input bg-background px-2 text-xs outline-none focus-visible:ring-2 focus-visible:ring-ring"
+									/>
+								</label>
+								<label className="min-w-0">
+									<span className="mb-1 block text-[11px] text-muted-foreground">
+										{t("suggestedEndLabel")}
+									</span>
+									<input
+										type="datetime-local"
+										value={toDateTimeLocalValue(item.suggestedEnd)}
+										onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
+											onUpdatePlanItem(item.id, {
+												suggestedEnd: fromDateTimeLocalValue(
+													event.target.value,
+												),
+											})
+										}
+										className="h-8 w-full rounded-md border border-input bg-background px-2 text-xs outline-none focus-visible:ring-2 focus-visible:ring-ring"
+									/>
+								</label>
+							</div>
+							<label>
+								<span className="mb-1 block text-[11px] text-muted-foreground">
+									{t("descriptionLabel")}
+								</span>
+								<textarea
+									value={item.description ?? ""}
+									onChange={(event: React.ChangeEvent<HTMLTextAreaElement>) =>
+										onUpdatePlanItem(item.id, {
+											description: event.target.value || null,
+										})
+									}
+									rows={2}
+									className="w-full resize-none rounded-md border border-input bg-background px-2 py-1 text-xs outline-none focus-visible:ring-2 focus-visible:ring-ring"
+								/>
+							</label>
 							<p className="line-clamp-2 text-[11px] text-muted-foreground">
-								{task.sourceFile} · {task.sourceText}
+								{item.sourceFiles.join(", ") || t("unknownType")}
+								{item.sourceText ? ` · ${item.sourceText}` : ""}
 							</p>
+							{item.scheduleReason && (
+								<p className="text-[11px] text-muted-foreground">
+									{item.scheduleReason}
+								</p>
+							)}
 						</div>
 					))}
 				</div>
@@ -257,7 +349,7 @@ export function ChatImportTodosPanel({
 				<p className="text-xs text-emerald-600">{successMessage}</p>
 			)}
 
-			{tasks.length > 0 && (
+			{planItems.length > 0 && (
 				<div className="flex items-center justify-end">
 					<button
 						type="button"
@@ -269,7 +361,9 @@ export function ChatImportTodosPanel({
 						)}
 					>
 						{isCreating && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-						{isCreating ? t("creating") : t("confirmCreate", { count: tasks.length })}
+						{isCreating
+							? t("creating")
+							: t("confirmCreate", { count: planItems.length })}
 					</button>
 				</div>
 			)}

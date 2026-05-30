@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from types import SimpleNamespace
+from typing import TYPE_CHECKING
 
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
@@ -17,6 +18,9 @@ TOO_LONG_TEXT_LENGTH = 501
 SCHEDULE_TODO_ID = 101
 FULL_COVERAGE = 100
 
+if TYPE_CHECKING:
+    import pytest
+
 
 def _client() -> TestClient:
     app = FastAPI()
@@ -27,6 +31,8 @@ def _client() -> TestClient:
 class FakeTodoService:
     def __init__(self) -> None:
         self.created = []
+        self.deleted = []
+        self.attachments = []
 
     def list_todos(self, **_kwargs: object):
         return {"total": 0, "todos": []}
@@ -34,6 +40,57 @@ class FakeTodoService:
     def create_todo(self, data):
         self.created.append(data)
         return SimpleNamespace(id=len(self.created), name=data.name, status=data.status.value)
+
+    def delete_todo(self, todo_id: int) -> None:
+        self.deleted.append(todo_id)
+
+    def add_attachment(
+        self,
+        *,
+        todo_id: int,
+        file_name: str,
+        file_path: str,
+        file_size: int | None,
+        mime_type: str | None,
+        file_hash: str | None,
+        source: str = "user",
+    ):
+        _ = file_hash
+        item = SimpleNamespace(
+            id=len(self.attachments) + 1,
+            todo_id=todo_id,
+            file_name=file_name,
+            file_path=file_path,
+            file_size=file_size,
+            mime_type=mime_type,
+            source=source,
+        )
+        self.attachments.append(item)
+        return item
+
+
+class FakeRouterLlmClient:
+    def is_available(self) -> bool:
+        return True
+
+    def chat(self, messages, temperature: float, max_tokens: int) -> str:
+        _ = messages, temperature, max_tokens
+        return """
+        {
+          "summary": "根据附件生成规划",
+          "todos": [
+            {
+              "title": "准备课程项目展示",
+              "description": "整理展示材料",
+              "priority": "medium",
+              "duration": "PT2H",
+              "source_file_indices": [0],
+              "source_text": "Course project requires presentation.",
+              "confidence": 0.8
+            }
+          ]
+        }
+        """
 
 
 def _client_with_todo_service(fake_service: FakeTodoService) -> TestClient:
@@ -288,3 +345,77 @@ def test_import_todos_endpoint_rejects_large_file_before_service_processing() ->
 
     assert response.status_code == HTTP_CONTENT_TOO_LARGE
     assert response.json()["error_code"] == "FILE_TOO_LARGE"
+
+
+def test_attachment_plan_endpoint_returns_confirmable_schedule(
+    tmp_path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        "lifetrace.services.agent_attachment_plan_service.get_attachments_dir",
+        lambda: tmp_path,
+    )
+    monkeypatch.setattr(
+        "lifetrace.services.agent_attachment_plan_service.get_llm_client",
+        lambda: FakeRouterLlmClient(),
+    )
+    client = _client_with_todo_service(FakeTodoService())
+
+    response = client.post(
+        "/api/agent/attachment-plan",
+        files={
+            "files": (
+                "course.txt",
+                b"Course project requires presentation.",
+                "text/plain",
+            )
+        },
+        data={
+            "prompt": "请根据附件生成日程规划",
+            "reference_time": "2026-05-30T10:00:00+08:00",
+            "planning_start": "2026-05-30T10:00:00+08:00",
+        },
+    )
+
+    assert response.status_code == HTTP_OK
+    data = response.json()
+    assert data["plan_id"]
+    assert data["file_results"][0]["status"] == "ready"
+    assert data["proposed_todos"][0]["title"] == "准备课程项目展示"
+    assert data["proposed_todos"][0]["duration"] == "PT2H"
+
+
+def test_attachment_plan_confirm_creates_draft_and_ai_attachment(
+    tmp_path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        "lifetrace.services.agent_attachment_plan_service.get_attachments_dir",
+        lambda: tmp_path,
+    )
+    monkeypatch.setattr(
+        "lifetrace.services.agent_attachment_plan_service.get_llm_client",
+        lambda: FakeRouterLlmClient(),
+    )
+    fake_service = FakeTodoService()
+    client = _client_with_todo_service(fake_service)
+
+    plan_response = client.post(
+        "/api/agent/attachment-plan",
+        files={"files": ("course.txt", b"Course project requires presentation.", "text/plain")},
+        data={
+            "prompt": "请根据附件生成日程规划",
+            "reference_time": "2026-05-30T10:00:00+08:00",
+            "planning_start": "2026-05-30T10:00:00+08:00",
+        },
+    )
+    plan_data = plan_response.json()
+
+    response = client.post(
+        f"/api/agent/attachment-plan/{plan_data['plan_id']}/confirm",
+        json={"proposed_todos": plan_data["proposed_todos"]},
+    )
+
+    assert response.status_code == HTTP_OK
+    assert response.json()["created_todos"][0]["name"] == "准备课程项目展示"
+    assert fake_service.created[0].status.value == "draft"
+    assert fake_service.attachments[0].source == "ai"
+    assert fake_service.attachments[0].file_name == "course.txt"

@@ -143,6 +143,7 @@ export function ChatPanel() {
 
 			<ChatInputSection
 				locale={locale}
+				conversationId={chatController.conversationId}
 				inputValue={chatController.inputValue}
 				isStreaming={chatController.isStreaming}
 				error={chatController.error}

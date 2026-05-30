@@ -134,6 +134,68 @@ class ImportTodosResponse(BaseModel):
     processing_time_ms: int = Field(..., description="处理耗时，毫秒")
 
 
+class AttachmentPlanFileResult(BaseModel):
+    """附件规划单个文件处理结果"""
+
+    file_name: str = Field(..., description="文件名")
+    mime_type: str | None = Field(None, description="MIME 类型")
+    size_bytes: int = Field(..., description="文件大小")
+    status: Literal["ready", "failed"] = Field(..., description="处理状态")
+    error_code: str | None = Field(None, description="失败错误码")
+    message: str | None = Field(None, description="处理说明")
+    raw_text_preview: str | None = Field(None, description="文本预览")
+
+
+class AttachmentPlanTodo(BaseModel):
+    """LLM 基于附件生成的待确认日程项"""
+
+    plan_item_id: str = Field(..., description="规划项临时 ID")
+    title: str = Field(..., min_length=1, max_length=200, description="待办标题")
+    description: str | None = Field(None, description="说明")
+    priority: TodoPriority = Field(TodoPriority.NONE, description="优先级")
+    due: datetime | None = Field(None, description="截止时间")
+    duration: str | None = Field(None, description="预估时长，ISO 8601 Duration")
+    suggested_start: datetime | None = Field(None, description="建议开始时间")
+    suggested_end: datetime | None = Field(None, description="建议结束时间")
+    schedule_reason: str | None = Field(None, description="建议时段理由")
+    source_file_indices: list[int] = Field(default_factory=list, description="来源文件序号")
+    source_files: list[str] = Field(default_factory=list, description="来源文件名")
+    source_text: str | None = Field(None, description="支撑该任务的原文或图片内容描述")
+    confidence: float = Field(0.7, ge=0, le=1, description="置信度")
+
+
+class AttachmentPlanResponse(BaseModel):
+    """附件驱动 AI 日程规划响应"""
+
+    plan_id: str = Field(..., description="临时规划 ID")
+    file_results: list[AttachmentPlanFileResult] = Field(..., description="文件处理结果")
+    proposed_todos: list[AttachmentPlanTodo] = Field(..., description="待确认日程项")
+    schedule_summary: str = Field("", description="日程规划摘要")
+    processing_time_ms: int = Field(..., description="处理耗时，毫秒")
+
+
+class AttachmentPlanConfirmRequest(BaseModel):
+    """确认附件规划并创建待办"""
+
+    proposed_todos: list[AttachmentPlanTodo] = Field(..., description="用户确认后的日程项")
+
+
+class AttachmentPlanCreatedTodo(BaseModel):
+    """附件规划确认后创建出的待办摘要"""
+
+    id: int = Field(..., description="待办 ID")
+    name: str = Field(..., description="待办标题")
+    status: str = Field(..., description="待办状态")
+    attachment_ids: list[int] = Field(default_factory=list, description="绑定附件 ID")
+
+
+class AttachmentPlanConfirmResponse(BaseModel):
+    """附件规划确认响应"""
+
+    created_todos: list[AttachmentPlanCreatedTodo] = Field(..., description="已创建待办")
+    processing_time_ms: int = Field(..., description="处理耗时，毫秒")
+
+
 class AgentErrorResponse(BaseModel):
     """Agent 接口错误响应"""
 
