@@ -16,6 +16,7 @@ import { ToolSelector } from "@/apps/chat/components/input/ToolSelector";
 import {
 	type AttachmentPlanApiResponse,
 	type AttachmentPlanConfirmResponse,
+	type AttachmentPlanCreateMode,
 	MAX_IMPORT_FILE_BYTES,
 	MAX_IMPORT_FILES,
 	makeClientId,
@@ -85,6 +86,9 @@ export function ChatInputSection({
 	const [uploadError, setUploadError] = useState<string | null>(null);
 	const [successMessage, setSuccessMessage] = useState<string | null>(null);
 	const [scheduleSummary, setScheduleSummary] = useState<string | null>(null);
+	const [createMode, setCreateMode] =
+		useState<AttachmentPlanCreateMode>("separate");
+	const [parentTitle, setParentTitle] = useState("");
 
 	useEffect(() => {
 		filesRef.current = files;
@@ -122,9 +126,21 @@ export function ChatInputSection({
 		setUploadError(null);
 		setSuccessMessage(null);
 		setScheduleSummary(null);
+		setCreateMode("separate");
+		setParentTitle("");
 		promptAppliedRef.current = false;
 		if (fileInputRef.current) fileInputRef.current.value = "";
 	}, [clearRemotePlan, files, planId]);
+
+	const buildDefaultParentTitle = useCallback(
+		(items: AttachmentPlanDraft[]) => {
+			const firstTitle = items.find((item) => item.title.trim())?.title.trim();
+			return firstTitle
+				? tImport("defaultParentTitle", { title: firstTitle })
+				: tImport("defaultParentTitleFallback");
+		},
+		[tImport],
+	);
 
 	const appendDefaultPrompt = useCallback(
 		(selectedFiles: File[]) => {
@@ -175,6 +191,8 @@ export function ChatInputSection({
 			setUploadError(null);
 			setSuccessMessage(null);
 			setScheduleSummary(null);
+			setCreateMode("separate");
+			setParentTitle("");
 			appendDefaultPrompt(selectedFiles);
 			if (fileInputRef.current) fileInputRef.current.value = "";
 		},
@@ -266,6 +284,10 @@ export function ChatInputSection({
 			const plannedItems = data.proposed_todos.map(toPlanDraft);
 			setPlanId(data.plan_id);
 			setPlanItems(plannedItems);
+			setCreateMode(plannedItems.length > 1 ? "nested" : "separate");
+			setParentTitle(
+				plannedItems.length > 1 ? buildDefaultParentTitle(plannedItems) : "",
+			);
 			setScheduleSummary(data.schedule_summary || null);
 			setFiles((current) =>
 				current.map((item, index) => {
@@ -301,6 +323,7 @@ export function ChatInputSection({
 		}
 	}, [
 		clearRemotePlan,
+		buildDefaultParentTitle,
 		conversationId,
 		inputValue,
 		onInputChange,
@@ -319,6 +342,8 @@ export function ChatInputSection({
 		setIsCreating(true);
 		setUploadError(null);
 		try {
+			const resolvedCreateMode =
+				validItems.length > 1 ? createMode : "separate";
 			const response = await fetch(
 				`/api/agent/attachment-plan/${planId}/confirm`,
 				{
@@ -326,6 +351,11 @@ export function ChatInputSection({
 					headers: { "Content-Type": "application/json" },
 					body: JSON.stringify({
 						proposed_todos: validItems.map(toApiTodo),
+						create_mode: resolvedCreateMode,
+						parent_title:
+							resolvedCreateMode === "nested"
+								? parentTitle.trim() || buildDefaultParentTitle(validItems)
+								: null,
 					}),
 				},
 			);
@@ -340,8 +370,16 @@ export function ChatInputSection({
 			setScheduleSummary(null);
 			setUploadError(null);
 			setSuccessMessage(
-				tImport("createSuccess", { count: data.created_todos.length }),
+				resolvedCreateMode === "nested"
+					? tImport("createSuccessNested", {
+							count: data.created_todos.filter(
+								(todo) => todo.parent_todo_id != null,
+							).length,
+						})
+					: tImport("createSuccess", { count: data.created_todos.length }),
 			);
+			setCreateMode("separate");
+			setParentTitle("");
 			promptAppliedRef.current = false;
 			if (fileInputRef.current) fileInputRef.current.value = "";
 			void queryClient.invalidateQueries({ queryKey: queryKeys.todos.all });
@@ -352,7 +390,16 @@ export function ChatInputSection({
 		} finally {
 			setIsCreating(false);
 		}
-	}, [files, planId, planItems, queryClient, tImport]);
+	}, [
+		buildDefaultParentTitle,
+		createMode,
+		files,
+		parentTitle,
+		planId,
+		planItems,
+		queryClient,
+		tImport,
+	]);
 
 	const handleSend = useCallback(() => {
 		if (filesRef.current.length > 0) {
@@ -404,6 +451,10 @@ export function ChatInputSection({
 				onUpdatePlanItem={updatePlanItem}
 				onConfirmCreate={confirmCreate}
 				onClearAll={clearAll}
+				createMode={createMode}
+				parentTitle={parentTitle}
+				onCreateModeChange={setCreateMode}
+				onParentTitleChange={setParentTitle}
 			/>
 			<InputBox
 				linkedTodos={

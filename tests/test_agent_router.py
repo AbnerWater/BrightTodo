@@ -384,6 +384,36 @@ def test_attachment_plan_endpoint_returns_confirmable_schedule(
     assert data["proposed_todos"][0]["duration"] == "PT2H"
 
 
+def test_text_plan_endpoint_returns_confirmable_schedule(
+    tmp_path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        "lifetrace.services.agent_attachment_plan_service.get_attachments_dir",
+        lambda: tmp_path,
+    )
+    monkeypatch.setattr(
+        "lifetrace.services.agent_attachment_plan_service.get_llm_client",
+        lambda: FakeRouterLlmClient(),
+    )
+    client = _client_with_todo_service(FakeTodoService())
+
+    response = client.post(
+        "/api/agent/text-plan",
+        json={
+            "prompt": "请把课程项目展示拆成可执行待办",
+            "reference_time": "2026-05-30T10:00:00+08:00",
+            "planning_start": "2026-05-30T10:00:00+08:00",
+        },
+    )
+
+    assert response.status_code == HTTP_OK
+    data = response.json()
+    assert data["plan_id"]
+    assert data["file_results"] == []
+    assert data["proposed_todos"][0]["title"] == "准备课程项目展示"
+    assert data["proposed_todos"][0]["source_file_indices"] == []
+
+
 def test_attachment_plan_confirm_creates_draft_and_ai_attachment(
     tmp_path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

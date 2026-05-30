@@ -28,6 +28,18 @@ class AgentParseTaskResponse(BaseModel):
     parse_version: str = Field(..., description="解析逻辑版本")
 
 
+class AgentTextPlanRequest(BaseModel):
+    """自然语言 AI 日程规划请求"""
+
+    prompt: str = Field(..., min_length=1, max_length=2000, description="用户输入的任务描述")
+    reference_time: datetime | None = Field(None, description="相对时间解析基准")
+    planning_start: datetime | None = Field(None, description="编排开始时间")
+    planning_end: datetime | None = Field(None, description="编排结束时间")
+    daily_available_hours: int | None = Field(
+        None, ge=1, le=16, description="每日可用学习/工作时长"
+    )
+
+
 class ScheduleSuggestTodo(BaseModel):
     """智能编排输入待办"""
 
@@ -178,6 +190,11 @@ class AttachmentPlanConfirmRequest(BaseModel):
     """确认附件规划并创建待办"""
 
     proposed_todos: list[AttachmentPlanTodo] = Field(..., description="用户确认后的日程项")
+    create_mode: Literal["separate", "nested"] = Field(
+        "separate", description="创建方式：separate=逐项创建，nested=父待办加子任务"
+    )
+    parent_title: str | None = Field(None, max_length=200, description="嵌套模式父待办标题")
+    parent_description: str | None = Field(None, description="嵌套模式父待办说明")
 
 
 class AttachmentPlanCreatedTodo(BaseModel):
@@ -186,6 +203,7 @@ class AttachmentPlanCreatedTodo(BaseModel):
     id: int = Field(..., description="待办 ID")
     name: str = Field(..., description="待办标题")
     status: str = Field(..., description="待办状态")
+    parent_todo_id: int | None = Field(None, description="父级待办 ID")
     attachment_ids: list[int] = Field(default_factory=list, description="绑定附件 ID")
 
 

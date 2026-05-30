@@ -11,6 +11,7 @@ from lifetrace.core.dependencies import get_todo_service
 from lifetrace.schemas.agent import (
     AgentParseTaskRequest,
     AgentParseTaskResponse,
+    AgentTextPlanRequest,
     AttachmentPlanConfirmRequest,
     AttachmentPlanConfirmResponse,
     AttachmentPlanResponse,
@@ -108,6 +109,22 @@ async def parse_task(request: AgentParseTaskRequest):
     return service.parse_task(text=text, reference_time=request.reference_time)
 
 
+@router.post("/text-plan", response_model=AttachmentPlanResponse)
+async def text_plan(request: AgentTextPlanRequest):
+    """基于自然语言生成待确认日程规划"""
+    try:
+        service = AgentAttachmentPlanService()
+        return service.create_text_plan(
+            prompt=request.prompt,
+            reference_time=request.reference_time,
+            planning_start=request.planning_start,
+            planning_end=request.planning_end,
+            daily_available_hours=request.daily_available_hours,
+        )
+    except AttachmentPlanError as exc:
+        return _error_response(exc.status_code, exc.error_code, exc.message, exc.detail)
+
+
 @router.post("/schedule-suggest", response_model=ScheduleSuggestResponse)
 async def schedule_suggest(request: ScheduleSuggestRequest):
     """生成避开课程冲突的待办执行时段建议"""
@@ -182,6 +199,9 @@ async def confirm_attachment_plan(
         return service.confirm_plan(
             plan_id=plan_id,
             proposed_todos=request.proposed_todos,
+            create_mode=request.create_mode,
+            parent_title=request.parent_title,
+            parent_description=request.parent_description,
             todo_service=todo_service,
         )
     except AttachmentPlanError as exc:

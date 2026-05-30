@@ -8,7 +8,7 @@ from types import SimpleNamespace
 import pytest
 from fastapi import HTTPException
 
-from lifetrace.schemas.todo import TodoStatus
+from lifetrace.schemas.todo import TodoPriority, TodoStatus
 from lifetrace.services.agent_attachment_plan_service import (
     AgentAttachmentPlanService,
     AttachmentPlanError,
@@ -21,6 +21,7 @@ HTTP_BAD_REQUEST = 400
 HTTP_BAD_GATEWAY = 502
 LLM_TEMPERATURE = 0.2
 LLM_MAX_TOKENS = 2600
+SECOND_CHILD_ORDER = 2
 
 
 class FakeUnavailableLlmClient:
@@ -172,6 +173,36 @@ def _plan_response() -> str:
     """
 
 
+def _multi_plan_response() -> str:
+    return """
+    {
+      "summary": "已根据附件拆解完整项目任务",
+      "todos": [
+        {
+          "title": "梳理课程项目需求",
+          "description": "阅读附件并整理需求清单",
+          "priority": "medium",
+          "due": null,
+          "duration": "PT1H",
+          "source_file_indices": [0],
+          "source_text": "Course project requires planning, implementation and report.",
+          "confidence": 0.88
+        },
+        {
+          "title": "完成项目报告初稿",
+          "description": "按照要求完成报告正文",
+          "priority": "high",
+          "due": null,
+          "duration": "PT2H",
+          "source_file_indices": [0],
+          "source_text": "Final report is required.",
+          "confidence": 0.84
+        }
+      ]
+    }
+    """
+
+
 def test_attachment_plan_uses_llm_and_confirm_binds_source_attachment(
     tmp_path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -214,6 +245,92 @@ def test_attachment_plan_uses_llm_and_confirm_binds_source_attachment(
     assert fake_todo_service.attachments[0].file_name == "course.txt"
     assert Path(fake_todo_service.attachments[0].file_path).exists()
     assert not (tmp_path / "agent-plans" / response.plan_id).exists()
+
+
+def test_confirm_plan_nested_mode_creates_parent_and_child_todos(
+    tmp_path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        "lifetrace.services.agent_attachment_plan_service.get_attachments_dir",
+        lambda: tmp_path,
+    )
+    service = AgentAttachmentPlanService(llm_client=FakeTextLlmClient(_multi_plan_response()))
+    response = service.create_plan(
+        files=[_txt_file("Course project requires planning, implementation and report.")],
+        prompt="请将附件作为一个完整任务拆成子任务",
+        reference_time=_reference_time(),
+        planning_start=_reference_time(),
+        planning_end=None,
+        daily_available_hours=6,
+    )
+
+    fake_todo_service = FakeTodoService()
+    confirm_response = service.confirm_plan(
+        plan_id=response.plan_id,
+        proposed_todos=response.proposed_todos,
+        create_mode="nested",
+        parent_title="完成课程项目",
+        todo_service=fake_todo_service,
+    )
+
+    assert [todo.name for todo in confirm_response.created_todos] == [
+        "完成课程项目",
+        "梳理课程项目需求",
+        "完成项目报告初稿",
+    ]
+    assert fake_todo_service.created[0].parent_todo_id is None
+    assert fake_todo_service.created[0].priority == TodoPriority.HIGH
+    assert fake_todo_service.created[1].parent_todo_id == 1
+    assert fake_todo_service.created[1].order == 1
+    assert fake_todo_service.created[2].parent_todo_id == 1
+    assert fake_todo_service.created[2].order == SECOND_CHILD_ORDER
+    assert fake_todo_service.attachments[0].todo_id == 1
+    assert confirm_response.created_todos[0].attachment_ids == [1]
+    assert confirm_response.created_todos[1].attachment_ids == []
+    assert confirm_response.created_todos[1].parent_todo_id == 1
+
+
+def test_text_plan_without_files_can_confirm_nested_todos(
+    tmp_path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        "lifetrace.services.agent_attachment_plan_service.get_attachments_dir",
+        lambda: tmp_path,
+    )
+    fake_llm = FakeTextLlmClient(_multi_plan_response())
+    service = AgentAttachmentPlanService(llm_client=fake_llm)
+
+    response = service.create_text_plan(
+        prompt="请把课程项目拆成可执行计划",
+        reference_time=_reference_time(),
+        planning_start=_reference_time(),
+        planning_end=None,
+        daily_available_hours=6,
+    )
+
+    assert response.file_results == []
+    assert [todo.title for todo in response.proposed_todos] == [
+        "梳理课程项目需求",
+        "完成项目报告初稿",
+    ]
+    assert "用户输入：请把课程项目拆成可执行计划" in fake_llm.messages[1]["content"]
+
+    fake_todo_service = FakeTodoService()
+    confirm_response = service.confirm_plan(
+        plan_id=response.plan_id,
+        proposed_todos=response.proposed_todos,
+        create_mode="nested",
+        parent_title="完成课程项目",
+        todo_service=fake_todo_service,
+    )
+
+    assert [todo.name for todo in confirm_response.created_todos] == [
+        "完成课程项目",
+        "梳理课程项目需求",
+        "完成项目报告初稿",
+    ]
+    assert fake_todo_service.created[1].parent_todo_id == 1
+    assert fake_todo_service.attachments == []
 
 
 def test_confirm_plan_omits_duration_when_fixed_time_slot_exists(

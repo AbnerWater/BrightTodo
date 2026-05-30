@@ -4,6 +4,8 @@ import type {
 } from "@/apps/chat/components/input/ChatImportTodosPanel";
 import type { TodoPriority } from "@/lib/types";
 
+export type AttachmentPlanCreateMode = "separate" | "nested";
+
 export type AttachmentPlanApiFileResult = {
 	file_name: string;
 	status: "ready" | "failed";
@@ -35,7 +37,13 @@ export type AttachmentPlanApiResponse = {
 };
 
 export type AttachmentPlanConfirmResponse = {
-	created_todos: Array<{ id: number; name: string; status: string }>;
+	created_todos: Array<{
+		id: number;
+		name: string;
+		status: string;
+		parent_todo_id?: number | null;
+		attachment_ids?: number[];
+	}>;
 };
 
 export const SUPPORTED_IMPORT_ACCEPT =

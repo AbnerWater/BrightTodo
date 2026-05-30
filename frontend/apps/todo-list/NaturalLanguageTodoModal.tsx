@@ -21,6 +21,7 @@ import {
 import {
 	type AttachmentPlanApiResponse,
 	type AttachmentPlanConfirmResponse,
+	type AttachmentPlanCreateMode,
 	MAX_IMPORT_FILE_BYTES,
 	MAX_IMPORT_FILES,
 	makeClientId,
@@ -94,6 +95,9 @@ export function NaturalLanguageTodoModal({
 	const [uploadError, setUploadError] = useState<string | null>(null);
 	const [successMessage, setSuccessMessage] = useState<string | null>(null);
 	const [scheduleSummary, setScheduleSummary] = useState<string | null>(null);
+	const [createMode, setCreateMode] =
+		useState<AttachmentPlanCreateMode>("separate");
+	const [parentTitle, setParentTitle] = useState("");
 	const [taskTitle, setTaskTitle] = useState("");
 	const [priority, setPriority] = useState<TodoPriority>("none");
 	const [dueLocal, setDueLocal] = useState("");
@@ -136,9 +140,21 @@ export function NaturalLanguageTodoModal({
 		setUploadError(null);
 		setSuccessMessage(null);
 		setScheduleSummary(null);
+		setCreateMode("separate");
+		setParentTitle("");
 		promptAppliedRef.current = false;
 		if (fileInputRef.current) fileInputRef.current.value = "";
 	}, [clearRemotePlan]);
+
+	const buildDefaultParentTitle = useCallback(
+		(items: AttachmentPlanDraft[]) => {
+			const firstTitle = items.find((item) => item.title.trim())?.title.trim();
+			return firstTitle
+				? tImport("defaultParentTitle", { title: firstTitle })
+				: tImport("defaultParentTitleFallback");
+		},
+		[tImport],
+	);
 
 	const resetState = useCallback(() => {
 		setInputText("");
@@ -206,6 +222,8 @@ export function NaturalLanguageTodoModal({
 			setUploadError(null);
 			setSuccessMessage(null);
 			setScheduleSummary(null);
+			setCreateMode("separate");
+			setParentTitle("");
 			appendDefaultPrompt(selectedFiles);
 			if (fileInputRef.current) fileInputRef.current.value = "";
 		},
@@ -289,6 +307,10 @@ export function NaturalLanguageTodoModal({
 			const plannedItems = data.proposed_todos.map(toPlanDraft);
 			setPlanId(data.plan_id);
 			setPlanItems(plannedItems);
+			setCreateMode(plannedItems.length > 1 ? "nested" : "separate");
+			setParentTitle(
+				plannedItems.length > 1 ? buildDefaultParentTitle(plannedItems) : "",
+			);
 			setScheduleSummary(data.schedule_summary || null);
 			setFiles((current) =>
 				current.map((item, index) => {
@@ -322,7 +344,60 @@ export function NaturalLanguageTodoModal({
 			setIsPlanning(false);
 		}
 		return true;
-	}, [clearRemotePlan, inputText, tImport]);
+	}, [buildDefaultParentTitle, clearRemotePlan, inputText, tImport]);
+
+	const submitTextPlan = useCallback(async () => {
+		const prompt = inputText.trim();
+		if (!prompt) {
+			toastError(t("agentInputRequired"));
+			return false;
+		}
+
+		setIsPlanning(true);
+		setUploadError(null);
+		setSuccessMessage(null);
+		setScheduleSummary(null);
+		setPlanItems([]);
+		setParseResult(null);
+		clearRemotePlan(planIdRef.current);
+		setPlanId(null);
+
+		try {
+			const response = await fetch("/api/agent/text-plan", {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({
+					prompt,
+					reference_time: new Date().toISOString(),
+					planning_start: new Date().toISOString(),
+				}),
+			});
+			if (!response.ok) {
+				throw new Error(await parseApiError(response));
+			}
+			const data = (await response.json()) as AttachmentPlanApiResponse;
+			const plannedItems = data.proposed_todos.map(toPlanDraft);
+			setPlanId(data.plan_id);
+			setPlanItems(plannedItems);
+			setCreateMode(plannedItems.length > 1 ? "nested" : "separate");
+			setParentTitle(
+				plannedItems.length > 1 ? buildDefaultParentTitle(plannedItems) : "",
+			);
+			setScheduleSummary(data.schedule_summary || null);
+			if (plannedItems.length === 0) {
+				toastError(tImport("noPlanTodos"));
+			} else {
+				setSuccessMessage(tImport("planSuccess", { count: plannedItems.length }));
+			}
+			return true;
+		} catch (planErr) {
+			const message = planErr instanceof Error ? planErr.message : String(planErr);
+			toastError(tImport("planFailed", { error: message }));
+			return true;
+		} finally {
+			setIsPlanning(false);
+		}
+	}, [buildDefaultParentTitle, clearRemotePlan, inputText, t, tImport]);
 
 	const confirmAttachmentCreate = useCallback(async () => {
 		const validItems = planItems.filter((item) => item.title.trim());
@@ -334,6 +409,8 @@ export function NaturalLanguageTodoModal({
 		setIsCreatingPlan(true);
 		setUploadError(null);
 		try {
+			const resolvedCreateMode =
+				validItems.length > 1 ? createMode : "separate";
 			const response = await fetch(
 				`/api/agent/attachment-plan/${planId}/confirm`,
 				{
@@ -341,6 +418,11 @@ export function NaturalLanguageTodoModal({
 					headers: { "Content-Type": "application/json" },
 					body: JSON.stringify({
 						proposed_todos: validItems.map(toApiTodo),
+						create_mode: resolvedCreateMode,
+						parent_title:
+							resolvedCreateMode === "nested"
+								? parentTitle.trim() || buildDefaultParentTitle(validItems)
+								: null,
 					}),
 				},
 			);
@@ -348,7 +430,15 @@ export function NaturalLanguageTodoModal({
 				throw new Error(await parseApiError(response));
 			}
 			const data = (await response.json()) as AttachmentPlanConfirmResponse;
-			toastSuccess(tImport("createSuccess", { count: data.created_todos.length }));
+			toastSuccess(
+				resolvedCreateMode === "nested"
+					? tImport("createSuccessNested", {
+							count: data.created_todos.filter(
+								(todo) => todo.parent_todo_id != null,
+							).length,
+						})
+					: tImport("createSuccess", { count: data.created_todos.length }),
+			);
 			void queryClient.invalidateQueries({ queryKey: queryKeys.todos.all });
 			handleClose();
 		} catch (createErr) {
@@ -358,11 +448,22 @@ export function NaturalLanguageTodoModal({
 		} finally {
 			setIsCreatingPlan(false);
 		}
-	}, [handleClose, planId, planItems, queryClient, tImport]);
+	}, [
+		buildDefaultParentTitle,
+		createMode,
+		handleClose,
+		parentTitle,
+		planId,
+		planItems,
+		queryClient,
+		tImport,
+	]);
 
 	const handleParse = async () => {
 		const handledByAttachmentPlan = await submitAttachmentPlan();
 		if (handledByAttachmentPlan) return;
+		const handledByTextPlan = await submitTextPlan();
+		if (handledByTextPlan) return;
 
 		const text = inputText.trim();
 		if (!text) {
@@ -559,6 +660,10 @@ export function NaturalLanguageTodoModal({
 							onUpdatePlanItem={updatePlanItem}
 							onConfirmCreate={confirmAttachmentCreate}
 							onClearAll={clearAttachmentState}
+							createMode={createMode}
+							parentTitle={parentTitle}
+							onCreateModeChange={setCreateMode}
+							onParentTitleChange={setParentTitle}
 							showConfirmAction={false}
 						/>
 
@@ -697,7 +802,9 @@ export function NaturalLanguageTodoModal({
 							<Check className="h-4 w-4" />
 						)}
 						{planItems.length > 0
-							? tImport("confirmCreate", { count: planItems.length })
+							? createMode === "nested" && planItems.length > 1
+								? tImport("confirmCreateNested", { count: planItems.length })
+								: tImport("confirmCreate", { count: planItems.length })
 							: t("agentCreate")}
 					</button>
 				</div>

@@ -3,13 +3,16 @@
 import {
 	Check,
 	FileText,
+	GitBranch,
 	Image as ImageIcon,
+	ListChecks,
 	Loader2,
 	Trash2,
 	X,
 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import type React from "react";
+import type { AttachmentPlanCreateMode } from "@/apps/chat/utils/attachmentPlan";
 import type { TodoPriority } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -55,6 +58,10 @@ type ChatImportTodosPanelProps = {
 	onUpdatePlanItem: (itemId: string, patch: Partial<AttachmentPlanDraft>) => void;
 	onConfirmCreate: () => void;
 	onClearAll: () => void;
+	createMode: AttachmentPlanCreateMode;
+	parentTitle: string;
+	onCreateModeChange: (mode: AttachmentPlanCreateMode) => void;
+	onParentTitleChange: (title: string) => void;
 	showConfirmAction?: boolean;
 };
 
@@ -106,6 +113,10 @@ export function ChatImportTodosPanel({
 	onUpdatePlanItem,
 	onConfirmCreate,
 	onClearAll,
+	createMode,
+	parentTitle,
+	onCreateModeChange,
+	onParentTitleChange,
 	showConfirmAction = true,
 }: ChatImportTodosPanelProps) {
 	const t = useTranslations("chat.importTodos");
@@ -119,6 +130,27 @@ export function ChatImportTodosPanel({
 
 	if (!hasContent) return null;
 
+	const showCreateModeSelector = planItems.length > 1;
+	const createModeOptions: Array<{
+		mode: AttachmentPlanCreateMode;
+		icon: typeof ListChecks;
+		label: string;
+		description: string;
+	}> = [
+		{
+			mode: "separate",
+			icon: ListChecks,
+			label: t("createModeSeparate"),
+			description: t("createModeSeparateDesc"),
+		},
+		{
+			mode: "nested",
+			icon: GitBranch,
+			label: t("createModeNested"),
+			description: t("createModeNestedDesc"),
+		},
+	];
+
 	return (
 		<div className="mb-3 space-y-3 rounded-lg border border-border bg-background/80 p-3 shadow-sm">
 			<div className="flex items-start justify-between gap-3">
@@ -127,7 +159,9 @@ export function ChatImportTodosPanel({
 						{planItems.length > 0 ? t("pendingTitle") : t("selectedFiles")}
 					</p>
 					<p className="mt-0.5 text-xs text-muted-foreground">
-						{planItems.length > 0 ? t("pendingDesc") : t("unsupportedHint")}
+						{planItems.length > 0
+							? t(files.length > 0 ? "pendingDesc" : "pendingTextDesc")
+							: t("unsupportedHint")}
 					</p>
 				</div>
 				<button
@@ -197,6 +231,62 @@ export function ChatImportTodosPanel({
 				<p className="rounded-md bg-muted/40 px-2 py-1.5 text-xs text-muted-foreground">
 					{scheduleSummary}
 				</p>
+			)}
+
+			{showCreateModeSelector && (
+				<div className="space-y-2 rounded-md border border-border bg-muted/20 p-2">
+					<p className="text-xs font-medium text-foreground">
+						{t("createModeLabel")}
+					</p>
+					<div className="grid gap-2 sm:grid-cols-2">
+						{createModeOptions.map((option) => {
+							const Icon = option.icon;
+							const selected = createMode === option.mode;
+							return (
+								<button
+									key={option.mode}
+									type="button"
+									onClick={() => onCreateModeChange(option.mode)}
+									disabled={isPlanning || isCreating}
+									className={cn(
+										"flex items-start gap-2 rounded-md border p-2 text-left transition-colors",
+										selected
+											? "border-primary bg-primary/10 text-foreground"
+											: "border-border bg-background text-muted-foreground hover:bg-muted",
+										"disabled:cursor-not-allowed disabled:opacity-60",
+									)}
+									aria-pressed={selected}
+								>
+									<Icon className="mt-0.5 h-4 w-4 shrink-0" />
+									<span className="min-w-0">
+										<span className="block text-xs font-medium">
+											{option.label}
+										</span>
+										<span className="mt-0.5 block text-[11px] leading-4">
+											{option.description}
+										</span>
+									</span>
+								</button>
+							);
+						})}
+					</div>
+					{createMode === "nested" && (
+						<label className="block">
+							<span className="mb-1 block text-[11px] text-muted-foreground">
+								{t("parentTitleLabel")}
+							</span>
+							<input
+								value={parentTitle}
+								onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
+									onParentTitleChange(event.target.value)
+								}
+								placeholder={t("parentTitlePlaceholder")}
+								disabled={isPlanning || isCreating}
+								className="h-8 w-full rounded-md border border-input bg-background px-2 text-xs outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60"
+							/>
+						</label>
+					)}
+				</div>
 			)}
 
 			{planItems.length > 0 && (
@@ -365,7 +455,9 @@ export function ChatImportTodosPanel({
 						{isCreating && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
 						{isCreating
 							? t("creating")
-							: t("confirmCreate", { count: planItems.length })}
+							: createMode === "nested" && planItems.length > 1
+								? t("confirmCreateNested", { count: planItems.length })
+								: t("confirmCreate", { count: planItems.length })}
 					</button>
 				</div>
 			)}

@@ -76,6 +76,17 @@ class _StoredPlanFile:
     image_data_url: str | None
 
 
+@dataclass(frozen=True)
+class _ConfirmPlanContext:
+    """确认规划时共享的创建上下文。"""
+
+    prompt: str
+    stored_files: dict[int, _StoredPlanFile]
+    todo_service: TodoService
+    created_todo_ids: list[int]
+    copied_paths: list[Path]
+
+
 class AttachmentPlanError(Exception):
     """附件规划接口契约错误。"""
 
@@ -189,16 +200,91 @@ class AgentAttachmentPlanService:
             shutil.rmtree(plan_dir, ignore_errors=True)
             raise
 
+    def create_text_plan(
+        self,
+        *,
+        prompt: str,
+        reference_time: datetime | None,
+        planning_start: datetime | None,
+        planning_end: datetime | None,
+        daily_available_hours: int | None,
+    ) -> AttachmentPlanResponse:
+        """基于自然语言生成待确认日程规划。"""
+        start = time.perf_counter()
+        clean_prompt = prompt.strip()
+        if not clean_prompt:
+            raise AttachmentPlanError(400, "INVALID_INPUT", "Prompt 不能为空")
+
+        self.cleanup_expired_plans()
+        llm_client = self._get_llm_client()
+        if not llm_client.is_available():
+            raise AttachmentPlanError(503, "LLM_UNAVAILABLE", "LLM 服务当前不可用，请检查配置")
+
+        plan_id = uuid4().hex
+        plan_dir = self._plan_dir(plan_id)
+        plan_dir.mkdir(parents=True, exist_ok=False)
+
+        try:
+            try:
+                response_text = self._call_llm_for_text_plan(
+                    llm_client=llm_client,
+                    prompt=clean_prompt,
+                    reference_time=reference_time,
+                )
+            except Exception as exc:
+                logger.warning(f"自然语言 AI 日程规划请求失败: {exc}")
+                raise AttachmentPlanError(
+                    502,
+                    "LLM_REQUEST_FAILED",
+                    self._build_llm_failure_message(exc),
+                    str(exc),
+                ) from exc
+
+            proposed_todos, summary = self._parse_plan_response(response_text, [])
+            proposed_todos, schedule_summary = self._apply_schedule_suggestions(
+                proposed_todos=proposed_todos,
+                planning_start=planning_start,
+                planning_end=planning_end,
+                daily_available_hours=daily_available_hours,
+            )
+            if summary and schedule_summary:
+                schedule_summary = f"{summary}\n{schedule_summary}"
+            elif summary:
+                schedule_summary = summary
+
+            self._write_manifest(
+                plan_dir=plan_dir,
+                prompt=clean_prompt,
+                files=[],
+                proposed_todos=proposed_todos,
+                schedule_summary=schedule_summary,
+            )
+
+            return AttachmentPlanResponse(
+                plan_id=plan_id,
+                file_results=[],
+                proposed_todos=proposed_todos,
+                schedule_summary=schedule_summary,
+                processing_time_ms=round((time.perf_counter() - start) * 1000),
+            )
+        except Exception:
+            shutil.rmtree(plan_dir, ignore_errors=True)
+            raise
+
     def confirm_plan(
         self,
         *,
         plan_id: str,
         proposed_todos: list[AttachmentPlanTodo],
+        create_mode: Literal["separate", "nested"] = "separate",
+        parent_title: str | None = None,
+        parent_description: str | None = None,
         todo_service: TodoService,
     ) -> AttachmentPlanConfirmResponse:
         """确认规划，创建草稿待办并把来源附件绑定到待办。"""
         start = time.perf_counter()
-        if not proposed_todos:
+        valid_todos = [todo for todo in proposed_todos if todo.title.strip()]
+        if not valid_todos:
             raise AttachmentPlanError(400, "INVALID_INPUT", "请至少确认 1 个待办")
 
         manifest = self._load_manifest(plan_id)
@@ -208,40 +294,25 @@ class AgentAttachmentPlanService:
         created: list[AttachmentPlanCreatedTodo] = []
         created_todo_ids: list[int] = []
         copied_paths: list[Path] = []
+        context = _ConfirmPlanContext(
+            prompt=prompt,
+            stored_files=stored_files,
+            todo_service=todo_service,
+            created_todo_ids=created_todo_ids,
+            copied_paths=copied_paths,
+        )
         try:
-            for todo in proposed_todos:
-                if not todo.title.strip():
-                    continue
-                has_fixed_end = todo.suggested_end is not None
-                created_todo = todo_service.create_todo(
-                    TodoCreate(
-                        name=todo.title.strip(),
-                        description=todo.description,
-                        user_notes=self._build_user_notes(todo, prompt),
-                        due=todo.due,
-                        duration=None if has_fixed_end else todo.duration,
-                        start_time=todo.suggested_start,
-                        end_time=todo.suggested_end,
-                        status=TodoStatus.DRAFT,
-                        priority=todo.priority,
-                        tags=["附件规划", "AI解析"],
-                    )
+            if create_mode == "nested":
+                created = self._create_nested_todos(
+                    proposed_todos=valid_todos,
+                    parent_title=parent_title,
+                    parent_description=parent_description,
+                    context=context,
                 )
-                created_todo_ids.append(created_todo.id)
-                attachment_ids = self._copy_and_bind_attachments(
-                    todo=todo,
-                    created_todo_id=created_todo.id,
-                    stored_files=stored_files,
-                    todo_service=todo_service,
-                    copied_paths=copied_paths,
-                )
-                created.append(
-                    AttachmentPlanCreatedTodo(
-                        id=created_todo.id,
-                        name=created_todo.name,
-                        status=created_todo.status,
-                        attachment_ids=attachment_ids,
-                    )
+            else:
+                created = self._create_separate_todos(
+                    proposed_todos=valid_todos,
+                    context=context,
                 )
         except Exception as exc:
             for todo_id in reversed(created_todo_ids):
@@ -266,6 +337,133 @@ class AgentAttachmentPlanService:
             created_todos=created,
             processing_time_ms=round((time.perf_counter() - start) * 1000),
         )
+
+    def _create_separate_todos(
+        self,
+        *,
+        proposed_todos: list[AttachmentPlanTodo],
+        context: _ConfirmPlanContext,
+    ) -> list[AttachmentPlanCreatedTodo]:
+        """按规划项逐条创建独立草稿待办。"""
+        created: list[AttachmentPlanCreatedTodo] = []
+        for order, todo in enumerate(proposed_todos, start=1):
+            created_todo = self._create_todo_from_plan_item(
+                todo=todo,
+                context=context,
+                parent_todo_id=None,
+                order=order,
+                tags=["附件规划", "AI解析"],
+            )
+            attachment_ids = self._copy_and_bind_attachments(
+                todo=todo,
+                created_todo_id=created_todo.id,
+                stored_files=context.stored_files,
+                todo_service=context.todo_service,
+                copied_paths=context.copied_paths,
+            )
+            created.append(
+                AttachmentPlanCreatedTodo(
+                    id=created_todo.id,
+                    name=created_todo.name,
+                    status=created_todo.status,
+                    parent_todo_id=None,
+                    attachment_ids=attachment_ids,
+                )
+            )
+        return created
+
+    def _create_nested_todos(
+        self,
+        *,
+        proposed_todos: list[AttachmentPlanTodo],
+        parent_title: str | None,
+        parent_description: str | None,
+        context: _ConfirmPlanContext,
+    ) -> list[AttachmentPlanCreatedTodo]:
+        """创建 1 个父待办，并把规划项作为它的子任务。"""
+        parent_todo = context.todo_service.create_todo(
+            TodoCreate(
+                name=self._resolve_parent_title(
+                    parent_title, proposed_todos, context.stored_files
+                ),
+                description=parent_description
+                or self._build_parent_description(proposed_todos, context.stored_files),
+                user_notes=self._build_parent_user_notes(proposed_todos, context.prompt),
+                due=self._latest_due(proposed_todos),
+                status=TodoStatus.DRAFT,
+                priority=self._highest_priority(proposed_todos),
+                tags=["附件规划", "AI解析", "父任务"],
+                order=0,
+            )
+        )
+        context.created_todo_ids.append(parent_todo.id)
+
+        parent_source_indices = self._collect_source_indices(proposed_todos)
+        parent_attachment_ids = self._copy_and_bind_source_indices(
+            source_indices=parent_source_indices,
+            created_todo_id=parent_todo.id,
+            stored_files=context.stored_files,
+            todo_service=context.todo_service,
+            copied_paths=context.copied_paths,
+        )
+
+        created = [
+            AttachmentPlanCreatedTodo(
+                id=parent_todo.id,
+                name=parent_todo.name,
+                status=parent_todo.status,
+                parent_todo_id=None,
+                attachment_ids=parent_attachment_ids,
+            )
+        ]
+        for order, todo in enumerate(proposed_todos, start=1):
+            child_todo = self._create_todo_from_plan_item(
+                todo=todo,
+                context=context,
+                parent_todo_id=parent_todo.id,
+                order=order,
+                tags=["附件规划", "AI解析", "子任务"],
+            )
+            created.append(
+                AttachmentPlanCreatedTodo(
+                    id=child_todo.id,
+                    name=child_todo.name,
+                    status=child_todo.status,
+                    parent_todo_id=parent_todo.id,
+                    attachment_ids=[],
+                )
+            )
+        return created
+
+    def _create_todo_from_plan_item(
+        self,
+        *,
+        todo: AttachmentPlanTodo,
+        context: _ConfirmPlanContext,
+        parent_todo_id: int | None,
+        order: int,
+        tags: list[str],
+    ) -> Any:
+        """把单个规划项转换为 Todo。"""
+        has_fixed_end = todo.suggested_end is not None
+        created_todo = context.todo_service.create_todo(
+            TodoCreate(
+                name=todo.title.strip(),
+                description=todo.description,
+                user_notes=self._build_user_notes(todo, context.prompt),
+                parent_todo_id=parent_todo_id,
+                due=todo.due,
+                duration=None if has_fixed_end else todo.duration,
+                start_time=todo.suggested_start,
+                end_time=todo.suggested_end,
+                status=TodoStatus.DRAFT,
+                priority=todo.priority,
+                tags=tags,
+                order=order,
+            )
+        )
+        context.created_todo_ids.append(created_todo.id)
+        return created_todo
 
     def delete_plan(self, plan_id: str) -> None:
         """删除未确认的临时规划附件。"""
@@ -422,6 +620,32 @@ class AgentAttachmentPlanService:
         )
         return response.choices[0].message.content or ""
 
+    def _call_llm_for_text_plan(
+        self,
+        *,
+        llm_client: Any,
+        prompt: str,
+        reference_time: datetime | None,
+    ) -> str:
+        system_prompt, text_prompt = self._build_text_plan_prompts(prompt, reference_time)
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": text_prompt},
+        ]
+        if hasattr(llm_client, "chat"):
+            return llm_client.chat(messages=messages, temperature=0.2, max_tokens=2600)
+
+        client = llm_client._get_client()
+        response = client.chat.completions.create(
+            model=llm_client.model,
+            messages=cast("list[ChatCompletionMessageParam]", messages),
+            temperature=0.2,
+            max_tokens=2600,
+            timeout=90,
+            extra_body={"enable_thinking": False},
+        )
+        return response.choices[0].message.content or ""
+
     def _resolve_attachment_vision_model(self, llm_client: Any) -> str:
         """选择附件规划图片请求使用的模型。"""
         primary_model = str(getattr(llm_client, "model", "") or settings.llm.model or "").strip()
@@ -456,7 +680,37 @@ class AgentAttachmentPlanService:
         if "service temporarily unavailable" in lower_detail or "算力池" in detail:
             return "AI 服务暂时不可用，请稍后重试或切换可用模型"
 
-        return "LLM 附件规划请求失败，请检查 AI 服务配置"
+        return "LLM 日程规划请求失败，请检查 AI 服务配置"
+
+    def _build_text_plan_prompts(
+        self,
+        prompt: str,
+        reference_time: datetime | None,
+    ) -> tuple[str, str]:
+        reference = reference_time or get_utc_now()
+        system_prompt = (
+            "你是 BrightToDo 的自然语言日程规划 Agent。"
+            "用户输入不一定是严格 TODO 列表，你必须理解其中隐含的学习、项目、作业、会议、"
+            "生活安排或完整任务步骤。"
+            "如果用户描述的是一个完整任务，请拆解为可执行步骤；如果包含多个不同意图，"
+            "请分别生成可确认事项。每个事项必须给出初始执行时长估计。"
+            "只输出 JSON，不要输出 Markdown。"
+        )
+        text_prompt = (
+            f"当前时间：{reference.isoformat()}\n"
+            f"用户输入：{prompt}\n\n"
+            "请生成最多 12 个待确认日程项。"
+            "如果能推断截止时间，due 使用 ISO 8601；否则为 null。"
+            "duration 必须使用 ISO 8601 Duration，例如 PT30M、PT1H、PT2H30M。"
+            "priority 只能是 high、medium、low、none。"
+            "source_file_indices 固定返回空数组。"
+            "source_text 填写最能支撑该任务的原始输入片段。\n\n"
+            "返回格式：\n"
+            '{"summary":"整体规划说明","todos":[{"title":"任务标题","description":"说明",'
+            '"priority":"medium","due":null,"duration":"PT1H",'
+            '"source_file_indices":[],"source_text":"来源依据","confidence":0.8}]}'
+        )
+        return system_prompt, text_prompt
 
     def _build_plan_prompts(
         self,
@@ -623,8 +877,26 @@ class AgentAttachmentPlanService:
         todo_service: TodoService,
         copied_paths: list[Path],
     ) -> list[int]:
+        return self._copy_and_bind_source_indices(
+            source_indices=todo.source_file_indices,
+            created_todo_id=created_todo_id,
+            stored_files=stored_files,
+            todo_service=todo_service,
+            copied_paths=copied_paths,
+        )
+
+    def _copy_and_bind_source_indices(
+        self,
+        *,
+        source_indices: list[int],
+        created_todo_id: int,
+        stored_files: dict[int, _StoredPlanFile],
+        todo_service: TodoService,
+        copied_paths: list[Path],
+    ) -> list[int]:
+        """按来源文件序号复制附件并绑定到指定待办。"""
         attachment_ids: list[int] = []
-        for source_index in todo.source_file_indices:
+        for source_index in sorted(set(source_indices)):
             stored = stored_files.get(source_index)
             if stored is None:
                 continue
@@ -645,6 +917,67 @@ class AgentAttachmentPlanService:
             )
             attachment_ids.append(attachment.id)
         return attachment_ids
+
+    def _resolve_parent_title(
+        self,
+        parent_title: str | None,
+        proposed_todos: list[AttachmentPlanTodo],
+        stored_files: dict[int, _StoredPlanFile],
+    ) -> str:
+        clean_title = (parent_title or "").strip()
+        if clean_title:
+            return clean_title[:200]
+        file_names = [file.file_name for file in stored_files.values()]
+        if len(file_names) == 1:
+            return f"完成 {Path(file_names[0]).stem or file_names[0]} 相关任务"[:200]
+        return f"完成 {proposed_todos[0].title.strip()}"[:200]
+
+    def _build_parent_description(
+        self,
+        proposed_todos: list[AttachmentPlanTodo],
+        stored_files: dict[int, _StoredPlanFile],
+    ) -> str:
+        file_names = sorted(file.file_name for file in stored_files.values())
+        source = f"来源附件：{', '.join(file_names)}" if file_names else "来源：AI 附件规划"
+        return f"{source}\n包含 {len(proposed_todos)} 个子任务，请按子任务逐步执行。"
+
+    def _build_parent_user_notes(
+        self,
+        proposed_todos: list[AttachmentPlanTodo],
+        prompt: str,
+    ) -> str:
+        lines = [
+            "来源：附件 AI 规划",
+            "创建方式：父待办 + 子任务",
+            f"原始 Prompt：{prompt}",
+            "子任务：",
+        ]
+        for index, todo in enumerate(proposed_todos, start=1):
+            lines.append(f"{index}. {todo.title.strip()}")
+        return "\n".join(lines)
+
+    def _collect_source_indices(self, proposed_todos: list[AttachmentPlanTodo]) -> list[int]:
+        indices: set[int] = set()
+        for todo in proposed_todos:
+            indices.update(todo.source_file_indices)
+        return sorted(indices)
+
+    def _highest_priority(self, proposed_todos: list[AttachmentPlanTodo]) -> TodoPriority:
+        priority_order = {
+            TodoPriority.HIGH: 4,
+            TodoPriority.MEDIUM: 3,
+            TodoPriority.LOW: 2,
+            TodoPriority.NONE: 1,
+        }
+        return max(
+            (todo.priority for todo in proposed_todos),
+            key=lambda priority: priority_order.get(priority, 0),
+            default=TodoPriority.NONE,
+        )
+
+    def _latest_due(self, proposed_todos: list[AttachmentPlanTodo]) -> datetime | None:
+        dues = [todo.due for todo in proposed_todos if todo.due is not None]
+        return max(dues) if dues else None
 
     def _write_manifest(
         self,
