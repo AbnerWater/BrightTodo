@@ -134,6 +134,11 @@ export function ChatImportTodosPanel({
 
 	const showCreateModeSelector = planItems.length > 1;
 	const isHeightConstrained = Boolean(className);
+	const contentClassName = cn(
+		isHeightConstrained
+			? "min-h-0 flex-1 space-y-3 overflow-y-auto pr-1"
+			: "space-y-3",
+	);
 	const createModeOptions: Array<{
 		mode: AttachmentPlanCreateMode;
 		icon: typeof ListChecks;
@@ -253,248 +258,226 @@ export function ChatImportTodosPanel({
 				</div>
 			)}
 
-			{scheduleSummary && (
-				<p
-					className={cn(
-						"rounded-md bg-muted/40 px-2 py-1.5 text-xs text-muted-foreground",
-						isHeightConstrained && "max-h-24 shrink-0 overflow-y-auto",
-					)}
-				>
-					{scheduleSummary}
-				</p>
-			)}
-
-			{showCreateModeSelector && (
-				<div
-					className={cn(
-						"space-y-2 rounded-md border border-border bg-muted/20 p-2",
-						isHeightConstrained && "shrink-0",
-					)}
-				>
-					<p className="text-xs font-medium text-foreground">
-						{t("createModeLabel")}
+			<div className={contentClassName}>
+				{scheduleSummary && (
+					<p className="rounded-md bg-muted/40 px-2 py-1.5 text-xs text-muted-foreground">
+						{scheduleSummary}
 					</p>
-					<div className="grid gap-2 sm:grid-cols-2">
-						{createModeOptions.map((option) => {
-							const Icon = option.icon;
-							const selected = createMode === option.mode;
-							return (
-								<button
-									key={option.mode}
-									type="button"
-									onClick={() => onCreateModeChange(option.mode)}
-									disabled={isPlanning || isCreating}
-									className={cn(
-										"flex items-start gap-2 rounded-md border p-2 text-left transition-colors",
-										selected
-											? "border-primary bg-primary/10 text-foreground"
-											: "border-border bg-background text-muted-foreground hover:bg-muted",
-										"disabled:cursor-not-allowed disabled:opacity-60",
-									)}
-									aria-pressed={selected}
-								>
-									<Icon className="mt-0.5 h-4 w-4 shrink-0" />
-									<span className="min-w-0">
-										<span className="block text-xs font-medium">
-											{option.label}
-										</span>
-										<span className="mt-0.5 block text-[11px] leading-4">
-											{option.description}
-										</span>
-									</span>
-								</button>
-							);
-						})}
-					</div>
-					{createMode === "nested" && (
-						<label className="block">
-							<span className="mb-1 block text-[11px] text-muted-foreground">
-								{t("parentTitleLabel")}
-							</span>
-							<input
-								value={parentTitle}
-								onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
-									onParentTitleChange(event.target.value)
-								}
-								placeholder={t("parentTitlePlaceholder")}
-								disabled={isPlanning || isCreating}
-								className="h-8 w-full rounded-md border border-input bg-background px-2 text-xs outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60"
-							/>
-						</label>
-					)}
-				</div>
-			)}
+				)}
 
-			{planItems.length > 0 && (
-				<div
-					className={cn(
-						"space-y-2 overflow-y-auto pr-1",
-						isHeightConstrained ? "min-h-32 flex-1" : "max-h-96",
-					)}
-				>
-					{planItems.map((item) => (
-						<div
-							key={item.id}
-							className="grid gap-2 rounded-md border border-border bg-background p-2"
-						>
-							<div className="flex items-start gap-2">
-								<label className="min-w-0 flex-1">
-									<span className="sr-only">{t("taskTitleLabel")}</span>
-									<input
-										value={item.title}
-										onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
-											onUpdatePlanItem(item.id, { title: event.target.value })
-										}
-										placeholder={t("taskTitlePlaceholder")}
-										className="h-8 w-full rounded-md border border-input bg-background px-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
-									/>
-								</label>
-								<button
-									type="button"
-									onClick={() => onRemovePlanItem(item.id)}
-									className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-foreground/5"
-									aria-label={t("removeTask")}
-								>
-									<Trash2 className="h-4 w-4" />
-								</button>
-							</div>
-							<div className="grid gap-2 sm:grid-cols-3">
-								<label className="min-w-0">
-									<span className="mb-1 block text-[11px] text-muted-foreground">
-										{t("dueLabel")}
-									</span>
-									<input
-										type="datetime-local"
-										value={toDateTimeLocalValue(item.due)}
-										onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
-											onUpdatePlanItem(item.id, {
-												due: fromDateTimeLocalValue(event.target.value),
-											})
-										}
-										className="h-8 w-full rounded-md border border-input bg-background px-2 text-xs outline-none focus-visible:ring-2 focus-visible:ring-ring"
-									/>
-								</label>
-								<label>
-									<span className="mb-1 block text-[11px] text-muted-foreground">
-										{t("priorityLabel")}
-									</span>
-									<select
-										value={item.priority}
-										onChange={(event: React.ChangeEvent<HTMLSelectElement>) =>
-											onUpdatePlanItem(item.id, {
-												priority: event.target.value as TodoPriority,
-											})
-										}
-										className="h-8 w-full rounded-md border border-input bg-background px-2 text-xs outline-none focus-visible:ring-2 focus-visible:ring-ring"
+				{showCreateModeSelector && (
+					<div className="space-y-2 rounded-md border border-border bg-muted/20 p-2">
+						<p className="text-xs font-medium text-foreground">
+							{t("createModeLabel")}
+						</p>
+						<div className="grid gap-2 sm:grid-cols-2">
+							{createModeOptions.map((option) => {
+								const Icon = option.icon;
+								const selected = createMode === option.mode;
+								return (
+									<button
+										key={option.mode}
+										type="button"
+										onClick={() => onCreateModeChange(option.mode)}
+										disabled={isPlanning || isCreating}
+										className={cn(
+											"flex items-start gap-2 rounded-md border p-2 text-left transition-colors",
+											selected
+												? "border-primary bg-primary/10 text-foreground"
+												: "border-border bg-background text-muted-foreground hover:bg-muted",
+											"disabled:cursor-not-allowed disabled:opacity-60",
+										)}
+										aria-pressed={selected}
 									>
-										{priorityOptions.map((priority) => (
-											<option key={priority} value={priority}>
-												{tPriority(priority)}
-											</option>
-										))}
-									</select>
-								</label>
-								<label>
-									<span className="mb-1 block text-[11px] text-muted-foreground">
-										{t("durationLabel")}
-									</span>
-									<input
-										value={item.duration ?? ""}
-										onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
-											onUpdatePlanItem(item.id, {
-												duration: event.target.value || null,
-											})
-										}
-										placeholder="PT1H"
-										className="h-8 w-full rounded-md border border-input bg-background px-2 text-xs outline-none focus-visible:ring-2 focus-visible:ring-ring"
-									/>
-								</label>
-							</div>
-							<div className="grid gap-2 sm:grid-cols-2">
-								<label className="min-w-0">
-									<span className="mb-1 block text-[11px] text-muted-foreground">
-										{t("suggestedStartLabel")}
-									</span>
-									<input
-										type="datetime-local"
-										value={toDateTimeLocalValue(item.suggestedStart)}
-										onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
-											onUpdatePlanItem(item.id, {
-												suggestedStart: fromDateTimeLocalValue(
-													event.target.value,
-												),
-											})
-										}
-										className="h-8 w-full rounded-md border border-input bg-background px-2 text-xs outline-none focus-visible:ring-2 focus-visible:ring-ring"
-									/>
-								</label>
-								<label className="min-w-0">
-									<span className="mb-1 block text-[11px] text-muted-foreground">
-										{t("suggestedEndLabel")}
-									</span>
-									<input
-										type="datetime-local"
-										value={toDateTimeLocalValue(item.suggestedEnd)}
-										onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
-											onUpdatePlanItem(item.id, {
-												suggestedEnd: fromDateTimeLocalValue(
-													event.target.value,
-												),
-											})
-										}
-										className="h-8 w-full rounded-md border border-input bg-background px-2 text-xs outline-none focus-visible:ring-2 focus-visible:ring-ring"
-									/>
-								</label>
-							</div>
-							<label>
+										<Icon className="mt-0.5 h-4 w-4 shrink-0" />
+										<span className="min-w-0">
+											<span className="block text-xs font-medium">
+												{option.label}
+											</span>
+											<span className="mt-0.5 block text-[11px] leading-4">
+												{option.description}
+											</span>
+										</span>
+									</button>
+								);
+							})}
+						</div>
+						{createMode === "nested" && (
+							<label className="block">
 								<span className="mb-1 block text-[11px] text-muted-foreground">
-									{t("descriptionLabel")}
+									{t("parentTitleLabel")}
 								</span>
-								<textarea
-									value={item.description ?? ""}
-									onChange={(event: React.ChangeEvent<HTMLTextAreaElement>) =>
-										onUpdatePlanItem(item.id, {
-											description: event.target.value || null,
-										})
+								<input
+									value={parentTitle}
+									onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
+										onParentTitleChange(event.target.value)
 									}
-									rows={2}
-									className="w-full resize-none rounded-md border border-input bg-background px-2 py-1 text-xs outline-none focus-visible:ring-2 focus-visible:ring-ring"
+									placeholder={t("parentTitlePlaceholder")}
+									disabled={isPlanning || isCreating}
+									className="h-8 w-full rounded-md border border-input bg-background px-2 text-xs outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60"
 								/>
 							</label>
-							<p className="line-clamp-2 text-[11px] text-muted-foreground">
-								{item.sourceFiles.join(", ") || t("unknownType")}
-								{item.sourceText ? ` · ${item.sourceText}` : ""}
-							</p>
-							{item.scheduleReason && (
-								<p className="text-[11px] text-muted-foreground">
-									{item.scheduleReason}
-								</p>
-							)}
-						</div>
-					))}
-				</div>
-			)}
+						)}
+					</div>
+				)}
 
-			{errorMessage && (
-				<p
-					className={cn(
-						"text-xs text-destructive",
-						isHeightConstrained && "shrink-0",
-					)}
-				>
-					{errorMessage}
-				</p>
-			)}
-			{successMessage && (
-				<p
-					className={cn(
-						"text-xs text-emerald-600",
-						isHeightConstrained && "shrink-0",
-					)}
-				>
-					{successMessage}
-				</p>
-			)}
+				{planItems.length > 0 && (
+					<div
+						className={cn(
+							"space-y-2",
+							!isHeightConstrained && "max-h-96 overflow-y-auto pr-1",
+						)}
+					>
+						{planItems.map((item) => (
+							<div
+								key={item.id}
+								className="grid gap-2 rounded-md border border-border bg-background p-2"
+							>
+								<div className="flex items-start gap-2">
+									<label className="min-w-0 flex-1">
+										<span className="sr-only">{t("taskTitleLabel")}</span>
+										<input
+											value={item.title}
+											onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
+												onUpdatePlanItem(item.id, { title: event.target.value })
+											}
+											placeholder={t("taskTitlePlaceholder")}
+											className="h-8 w-full rounded-md border border-input bg-background px-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+										/>
+									</label>
+									<button
+										type="button"
+										onClick={() => onRemovePlanItem(item.id)}
+										className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-foreground/5"
+										aria-label={t("removeTask")}
+									>
+										<Trash2 className="h-4 w-4" />
+									</button>
+								</div>
+								<div className="grid gap-2 sm:grid-cols-3">
+									<label className="min-w-0">
+										<span className="mb-1 block text-[11px] text-muted-foreground">
+											{t("dueLabel")}
+										</span>
+										<input
+											type="datetime-local"
+											value={toDateTimeLocalValue(item.due)}
+											onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
+												onUpdatePlanItem(item.id, {
+													due: fromDateTimeLocalValue(event.target.value),
+												})
+											}
+											className="h-8 w-full rounded-md border border-input bg-background px-2 text-xs outline-none focus-visible:ring-2 focus-visible:ring-ring"
+										/>
+									</label>
+									<label>
+										<span className="mb-1 block text-[11px] text-muted-foreground">
+											{t("priorityLabel")}
+										</span>
+										<select
+											value={item.priority}
+											onChange={(event: React.ChangeEvent<HTMLSelectElement>) =>
+												onUpdatePlanItem(item.id, {
+													priority: event.target.value as TodoPriority,
+												})
+											}
+											className="h-8 w-full rounded-md border border-input bg-background px-2 text-xs outline-none focus-visible:ring-2 focus-visible:ring-ring"
+										>
+											{priorityOptions.map((priority) => (
+												<option key={priority} value={priority}>
+													{tPriority(priority)}
+												</option>
+											))}
+										</select>
+									</label>
+									<label>
+										<span className="mb-1 block text-[11px] text-muted-foreground">
+											{t("durationLabel")}
+										</span>
+										<input
+											value={item.duration ?? ""}
+											onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
+												onUpdatePlanItem(item.id, {
+													duration: event.target.value || null,
+												})
+											}
+											placeholder="PT1H"
+											className="h-8 w-full rounded-md border border-input bg-background px-2 text-xs outline-none focus-visible:ring-2 focus-visible:ring-ring"
+										/>
+									</label>
+								</div>
+								<div className="grid gap-2 sm:grid-cols-2">
+									<label className="min-w-0">
+										<span className="mb-1 block text-[11px] text-muted-foreground">
+											{t("suggestedStartLabel")}
+										</span>
+										<input
+											type="datetime-local"
+											value={toDateTimeLocalValue(item.suggestedStart)}
+											onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
+												onUpdatePlanItem(item.id, {
+													suggestedStart: fromDateTimeLocalValue(
+														event.target.value,
+													),
+												})
+											}
+											className="h-8 w-full rounded-md border border-input bg-background px-2 text-xs outline-none focus-visible:ring-2 focus-visible:ring-ring"
+										/>
+									</label>
+									<label className="min-w-0">
+										<span className="mb-1 block text-[11px] text-muted-foreground">
+											{t("suggestedEndLabel")}
+										</span>
+										<input
+											type="datetime-local"
+											value={toDateTimeLocalValue(item.suggestedEnd)}
+											onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
+												onUpdatePlanItem(item.id, {
+													suggestedEnd: fromDateTimeLocalValue(
+														event.target.value,
+													),
+												})
+											}
+											className="h-8 w-full rounded-md border border-input bg-background px-2 text-xs outline-none focus-visible:ring-2 focus-visible:ring-ring"
+										/>
+									</label>
+								</div>
+								<label>
+									<span className="mb-1 block text-[11px] text-muted-foreground">
+										{t("descriptionLabel")}
+									</span>
+									<textarea
+										value={item.description ?? ""}
+										onChange={(event: React.ChangeEvent<HTMLTextAreaElement>) =>
+											onUpdatePlanItem(item.id, {
+												description: event.target.value || null,
+											})
+										}
+										rows={2}
+										className="w-full resize-none rounded-md border border-input bg-background px-2 py-1 text-xs outline-none focus-visible:ring-2 focus-visible:ring-ring"
+									/>
+								</label>
+								<p className="line-clamp-2 text-[11px] text-muted-foreground">
+									{item.sourceFiles.join(", ") || t("unknownType")}
+									{item.sourceText ? ` · ${item.sourceText}` : ""}
+								</p>
+								{item.scheduleReason && (
+									<p className="text-[11px] text-muted-foreground">
+										{item.scheduleReason}
+									</p>
+								)}
+							</div>
+						))}
+					</div>
+				)}
+
+				{errorMessage && (
+					<p className="text-xs text-destructive">{errorMessage}</p>
+				)}
+				{successMessage && (
+					<p className="text-xs text-emerald-600">{successMessage}</p>
+				)}
+			</div>
 
 			{showConfirmAction && planItems.length > 0 && (
 				<div
