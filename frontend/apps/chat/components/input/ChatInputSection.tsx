@@ -426,8 +426,18 @@ export function ChatInputSection({
 		[onKeyDown, submitAttachmentPlan],
 	);
 
+	const shouldConstrainPlanner =
+		planItems.length > 0 || isPlanning || scheduleSummary !== null;
+
 	return (
-		<div className="bg-background p-4">
+		<div
+			className={cn(
+				"flex min-h-0 shrink-0 flex-col bg-background p-4",
+				shouldConstrainPlanner
+					? "h-[min(72dvh,680px)]"
+					: "max-h-[min(72dvh,680px)]",
+			)}
+		>
 			<input
 				ref={fileInputRef}
 				type="file"
@@ -455,53 +465,56 @@ export function ChatInputSection({
 				parentTitle={parentTitle}
 				onCreateModeChange={setCreateMode}
 				onParentTitleChange={setParentTitle}
-			/>
-			<InputBox
-				linkedTodos={
-					<LinkedTodos
-						effectiveTodos={effectiveTodos}
-						hasSelection={hasSelection}
-						locale={locale}
-						showTodosExpanded={showTodosExpanded}
-						onToggleExpand={onToggleExpand}
-						onClearSelection={onClearSelection}
-						onToggleTodo={onToggleTodo}
-					/>
-				}
-				modeSwitcher={
-					<div className="flex items-center gap-2" ref={modeMenuRef}>
-						<ToolSelector disabled={isStreaming || isPlanning} />
-					</div>
-				}
-				inputValue={inputValue}
-				placeholder={inputPlaceholder}
-				isStreaming={isStreaming || isPlanning}
-				locale={locale}
-				uploadButton={
-					<button
-						type="button"
-						onClick={() => fileInputRef.current?.click()}
-						disabled={isStreaming || isPlanning || isCreating}
-						className={cn(
-							"flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground",
-							"hover:bg-foreground/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-							"disabled:cursor-not-allowed disabled:opacity-50",
-						)}
-						aria-label={tImport("uploadLabel")}
-						title={tImport("uploadLabel")}
-					>
-						<Paperclip className="h-4 w-4" />
-					</button>
-				}
-				onChange={onInputChange}
-				onSend={handleSend}
-				onStop={onStop}
-				onKeyDown={handleKeyDown}
-				onCompositionStart={onCompositionStart}
-				onCompositionEnd={onCompositionEnd}
+				className={shouldConstrainPlanner ? "flex-1" : undefined}
 			/>
 
-			{error && <p className="mt-2 text-sm">{error}</p>}
+			{error && <p className="mb-2 text-sm">{error}</p>}
+			<div className="shrink-0">
+				<InputBox
+					linkedTodos={
+						<LinkedTodos
+							effectiveTodos={effectiveTodos}
+							hasSelection={hasSelection}
+							locale={locale}
+							showTodosExpanded={showTodosExpanded}
+							onToggleExpand={onToggleExpand}
+							onClearSelection={onClearSelection}
+							onToggleTodo={onToggleTodo}
+						/>
+					}
+					modeSwitcher={
+						<div className="flex items-center gap-2" ref={modeMenuRef}>
+							<ToolSelector disabled={isStreaming || isPlanning} />
+						</div>
+					}
+					inputValue={inputValue}
+					placeholder={inputPlaceholder}
+					isStreaming={isStreaming || isPlanning}
+					locale={locale}
+					uploadButton={
+						<button
+							type="button"
+							onClick={() => fileInputRef.current?.click()}
+							disabled={isStreaming || isPlanning || isCreating}
+							className={cn(
+								"flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground",
+								"hover:bg-foreground/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+								"disabled:cursor-not-allowed disabled:opacity-50",
+							)}
+							aria-label={tImport("uploadLabel")}
+							title={tImport("uploadLabel")}
+						>
+							<Paperclip className="h-4 w-4" />
+						</button>
+					}
+					onChange={onInputChange}
+					onSend={handleSend}
+					onStop={onStop}
+					onKeyDown={handleKeyDown}
+					onCompositionStart={onCompositionStart}
+					onCompositionEnd={onCompositionEnd}
+				/>
+			</div>
 		</div>
 	);
 }

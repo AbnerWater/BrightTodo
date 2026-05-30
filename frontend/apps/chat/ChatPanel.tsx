@@ -78,7 +78,7 @@ export function ChatPanel() {
 	}, [chatController.messages]);
 
 	return (
-		<div className="flex h-full flex-col bg-background">
+		<div className="flex h-full min-h-0 flex-col bg-background">
 			<HeaderBar
 				chatHistoryLabel={tPage("chatHistory")}
 				newChatLabel={tPage("newChat")}

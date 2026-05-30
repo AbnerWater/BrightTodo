@@ -63,6 +63,7 @@ type ChatImportTodosPanelProps = {
 	onCreateModeChange: (mode: AttachmentPlanCreateMode) => void;
 	onParentTitleChange: (title: string) => void;
 	showConfirmAction?: boolean;
+	className?: string;
 };
 
 const priorityOptions: TodoPriority[] = ["none", "low", "medium", "high"];
@@ -118,6 +119,7 @@ export function ChatImportTodosPanel({
 	onCreateModeChange,
 	onParentTitleChange,
 	showConfirmAction = true,
+	className,
 }: ChatImportTodosPanelProps) {
 	const t = useTranslations("chat.importTodos");
 	const tPriority = useTranslations("common.priority");
@@ -131,6 +133,7 @@ export function ChatImportTodosPanel({
 	if (!hasContent) return null;
 
 	const showCreateModeSelector = planItems.length > 1;
+	const isHeightConstrained = Boolean(className);
 	const createModeOptions: Array<{
 		mode: AttachmentPlanCreateMode;
 		icon: typeof ListChecks;
@@ -152,8 +155,21 @@ export function ChatImportTodosPanel({
 	];
 
 	return (
-		<div className="mb-3 space-y-3 rounded-lg border border-border bg-background/80 p-3 shadow-sm">
-			<div className="flex items-start justify-between gap-3">
+		<div
+			className={cn(
+				"mb-3 rounded-lg border border-border bg-background/80 p-3 shadow-sm",
+				isHeightConstrained
+					? "flex min-h-0 flex-col gap-3 overflow-hidden"
+					: "space-y-3",
+				className,
+			)}
+		>
+			<div
+				className={cn(
+					"flex items-start justify-between gap-3",
+					isHeightConstrained && "shrink-0",
+				)}
+			>
 				<div>
 					<p className="text-sm font-medium text-foreground">
 						{planItems.length > 0 ? t("pendingTitle") : t("selectedFiles")}
@@ -175,7 +191,12 @@ export function ChatImportTodosPanel({
 			</div>
 
 			{files.length > 0 && (
-				<div className="grid gap-2 sm:grid-cols-2">
+				<div
+					className={cn(
+						"grid gap-2 sm:grid-cols-2",
+						isHeightConstrained && "shrink-0",
+					)}
+				>
 					{files.map((file) => (
 						<div
 							key={file.id}
@@ -222,19 +243,34 @@ export function ChatImportTodosPanel({
 			)}
 
 			{isPlanning && (
-				<div className="overflow-hidden rounded-full bg-muted">
+				<div
+					className={cn(
+						"overflow-hidden rounded-full bg-muted",
+						isHeightConstrained && "shrink-0",
+					)}
+				>
 					<div className="h-1 w-1/2 animate-pulse rounded-full bg-primary" />
 				</div>
 			)}
 
 			{scheduleSummary && (
-				<p className="rounded-md bg-muted/40 px-2 py-1.5 text-xs text-muted-foreground">
+				<p
+					className={cn(
+						"rounded-md bg-muted/40 px-2 py-1.5 text-xs text-muted-foreground",
+						isHeightConstrained && "max-h-24 shrink-0 overflow-y-auto",
+					)}
+				>
 					{scheduleSummary}
 				</p>
 			)}
 
 			{showCreateModeSelector && (
-				<div className="space-y-2 rounded-md border border-border bg-muted/20 p-2">
+				<div
+					className={cn(
+						"space-y-2 rounded-md border border-border bg-muted/20 p-2",
+						isHeightConstrained && "shrink-0",
+					)}
+				>
 					<p className="text-xs font-medium text-foreground">
 						{t("createModeLabel")}
 					</p>
@@ -290,7 +326,12 @@ export function ChatImportTodosPanel({
 			)}
 
 			{planItems.length > 0 && (
-				<div className="max-h-96 space-y-2 overflow-y-auto pr-1">
+				<div
+					className={cn(
+						"space-y-2 overflow-y-auto pr-1",
+						isHeightConstrained ? "min-h-32 flex-1" : "max-h-96",
+					)}
+				>
 					{planItems.map((item) => (
 						<div
 							key={item.id}
@@ -435,30 +476,54 @@ export function ChatImportTodosPanel({
 			)}
 
 			{errorMessage && (
-				<p className="text-xs text-destructive">{errorMessage}</p>
+				<p
+					className={cn(
+						"text-xs text-destructive",
+						isHeightConstrained && "shrink-0",
+					)}
+				>
+					{errorMessage}
+				</p>
 			)}
 			{successMessage && (
-				<p className="text-xs text-emerald-600">{successMessage}</p>
+				<p
+					className={cn(
+						"text-xs text-emerald-600",
+						isHeightConstrained && "shrink-0",
+					)}
+				>
+					{successMessage}
+				</p>
 			)}
 
 			{showConfirmAction && planItems.length > 0 && (
-				<div className="flex items-center justify-end">
-					<button
-						type="button"
-						onClick={onConfirmCreate}
-						disabled={isCreating}
-						className={cn(
-							"inline-flex h-8 items-center gap-2 rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground",
-							"hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60",
-						)}
+				<div
+					className={cn(
+						isHeightConstrained
+							? "shrink-0 border-t border-border/70 pt-2"
+							: "flex items-center justify-end",
+					)}
+				>
+					<div
+						className={cn(isHeightConstrained && "flex items-center justify-end")}
 					>
-						{isCreating && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-						{isCreating
-							? t("creating")
-							: createMode === "nested" && planItems.length > 1
-								? t("confirmCreateNested", { count: planItems.length })
-								: t("confirmCreate", { count: planItems.length })}
-					</button>
+						<button
+							type="button"
+							onClick={onConfirmCreate}
+							disabled={isCreating}
+							className={cn(
+								"inline-flex h-8 items-center gap-2 rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground",
+								"hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60",
+							)}
+						>
+							{isCreating && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+							{isCreating
+								? t("creating")
+								: createMode === "nested" && planItems.length > 1
+									? t("confirmCreateNested", { count: planItems.length })
+									: t("confirmCreate", { count: planItems.length })}
+						</button>
+					</div>
 				</div>
 			)}
 		</div>
