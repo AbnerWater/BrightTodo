@@ -55,6 +55,7 @@ type ChatImportTodosPanelProps = {
 	onUpdatePlanItem: (itemId: string, patch: Partial<AttachmentPlanDraft>) => void;
 	onConfirmCreate: () => void;
 	onClearAll: () => void;
+	showConfirmAction?: boolean;
 };
 
 const priorityOptions: TodoPriority[] = ["none", "low", "medium", "high"];
@@ -105,6 +106,7 @@ export function ChatImportTodosPanel({
 	onUpdatePlanItem,
 	onConfirmCreate,
 	onClearAll,
+	showConfirmAction = true,
 }: ChatImportTodosPanelProps) {
 	const t = useTranslations("chat.importTodos");
 	const tPriority = useTranslations("common.priority");
@@ -349,7 +351,7 @@ export function ChatImportTodosPanel({
 				<p className="text-xs text-emerald-600">{successMessage}</p>
 			)}
 
-			{planItems.length > 0 && (
+			{showConfirmAction && planItems.length > 0 && (
 				<div className="flex items-center justify-end">
 					<button
 						type="button"

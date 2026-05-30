@@ -10,8 +10,14 @@ $ProgressPreference = "SilentlyContinue"
 
 $RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $FrontendDir = Join-Path $RepoRoot "frontend"
-$ConfigFile = Join-Path $RepoRoot "lifetrace\config\config.yaml"
 $DefaultConfigFile = Join-Path $RepoRoot "lifetrace\config\default_config.yaml"
+$DefaultDataDir = Join-Path $env:LOCALAPPDATA "BrightToDo"
+if (-not $env:LIFETRACE_DATA_DIR) {
+    $env:LIFETRACE_DATA_DIR = $DefaultDataDir
+}
+$UserConfigDir = Join-Path $env:LIFETRACE_DATA_DIR "config"
+$ConfigFile = Join-Path $UserConfigDir "config.yaml"
+$UserDefaultConfigFile = Join-Path $UserConfigDir "default_config.yaml"
 $DevLogDir = Join-Path $RepoRoot "lifetrace\logs\dev"
 $BackendOutLogFile = Join-Path $DevLogDir "backend.out.log"
 $BackendErrLogFile = Join-Path $DevLogDir "backend.err.log"
@@ -99,11 +105,17 @@ function Ensure-Pnpm {
 }
 
 function Ensure-Config {
+    if (-not (Test-Path $UserConfigDir)) {
+        New-Item -ItemType Directory -Force -Path $UserConfigDir | Out-Null
+    }
+    if ((-not (Test-Path $UserDefaultConfigFile)) -and (Test-Path $DefaultConfigFile)) {
+        Copy-Item -LiteralPath $DefaultConfigFile -Destination $UserDefaultConfigFile
+    }
     if ((Test-Path $ConfigFile) -or (-not (Test-Path $DefaultConfigFile))) {
         return
     }
 
-    Write-Step "Creating local config.yaml from default_config.yaml"
+    Write-Step "Creating user config.yaml from default_config.yaml"
     Copy-Item -LiteralPath $DefaultConfigFile -Destination $ConfigFile
 }
 
@@ -212,6 +224,8 @@ if (-not (Test-Path $FrontendDir)) {
 }
 
 Write-Step "BrightToDo environment check"
+Write-Host "Data dir: $env:LIFETRACE_DATA_DIR"
+Write-Host "Config:   $ConfigFile"
 Ensure-Node
 Ensure-Uv
 Ensure-Pnpm

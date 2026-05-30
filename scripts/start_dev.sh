@@ -4,8 +4,14 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 FRONTEND_DIR="$REPO_ROOT/frontend"
-CONFIG_FILE="$REPO_ROOT/lifetrace/config/config.yaml"
 DEFAULT_CONFIG_FILE="$REPO_ROOT/lifetrace/config/default_config.yaml"
+if [ -z "${LIFETRACE_DATA_DIR:-}" ]; then
+  LIFETRACE_DATA_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/BrightToDo"
+fi
+export LIFETRACE_DATA_DIR
+USER_CONFIG_DIR="$LIFETRACE_DATA_DIR/config"
+CONFIG_FILE="$USER_CONFIG_DIR/config.yaml"
+USER_DEFAULT_CONFIG_FILE="$USER_CONFIG_DIR/default_config.yaml"
 SKIP_INSTALL=0
 INSTALL_ONLY=0
 STARTUP_TIMEOUT=180
@@ -120,8 +126,12 @@ ensure_http_client() {
 }
 
 ensure_config() {
+  mkdir -p "$USER_CONFIG_DIR"
+  if [ ! -f "$USER_DEFAULT_CONFIG_FILE" ] && [ -f "$DEFAULT_CONFIG_FILE" ]; then
+    cp "$DEFAULT_CONFIG_FILE" "$USER_DEFAULT_CONFIG_FILE"
+  fi
   if [ ! -f "$CONFIG_FILE" ] && [ -f "$DEFAULT_CONFIG_FILE" ]; then
-    step "Creating local config.yaml from default_config.yaml"
+    step "Creating user config.yaml from default_config.yaml"
     cp "$DEFAULT_CONFIG_FILE" "$CONFIG_FILE"
   fi
 }
@@ -165,6 +175,8 @@ if [ ! -d "$FRONTEND_DIR" ]; then
 fi
 
 step "BrightToDo environment check"
+echo "Data dir: $LIFETRACE_DATA_DIR"
+echo "Config:   $CONFIG_FILE"
 ensure_node
 ensure_uv
 ensure_pnpm

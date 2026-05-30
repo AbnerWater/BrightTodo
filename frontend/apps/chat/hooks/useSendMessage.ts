@@ -300,10 +300,11 @@ export const useSendMessage = ({
 				// 检查是否应该更新 isStreaming
 				const currentDisplayedSessionId =
 					useChatStore.getState().conversationId;
-				if (
-					requestSessionId &&
-					currentDisplayedSessionId === requestSessionId
-				) {
+				const shouldClearStreaming =
+					streamController.isActiveRequest(requestId) ||
+					!requestSessionId ||
+					currentDisplayedSessionId === requestSessionId;
+				if (shouldClearStreaming) {
 					setIsStreaming(false);
 				}
 

@@ -1,18 +1,38 @@
 "use client";
 
+import { useQueryClient } from "@tanstack/react-query";
 import {
 	AlertTriangle,
 	Check,
 	Clock,
 	Loader2,
+	Paperclip,
 	Send,
 	Sparkles,
 	X,
 } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import {
+	type AttachmentPlanDraft,
+	ChatImportTodosPanel,
+	type UploadFileItem,
+} from "@/apps/chat/components/input/ChatImportTodosPanel";
+import {
+	type AttachmentPlanApiResponse,
+	type AttachmentPlanConfirmResponse,
+	MAX_IMPORT_FILE_BYTES,
+	MAX_IMPORT_FILES,
+	makeClientId,
+	parseApiError,
+	revokePreviewUrls,
+	SUPPORTED_IMPORT_ACCEPT,
+	toApiTodo,
+	toPlanDraft,
+} from "@/apps/chat/utils/attachmentPlan";
 import { customFetcher } from "@/lib/api/fetcher";
 import { useCreateTodo } from "@/lib/query";
+import { queryKeys } from "@/lib/query/keys";
 import { toastError, toastSuccess } from "@/lib/toast";
 import type { CreateTodoInput, TodoPriority } from "@/lib/types";
 import { cn, getPriorityLabel } from "@/lib/utils";
@@ -54,34 +74,296 @@ export function NaturalLanguageTodoModal({
 }: NaturalLanguageTodoModalProps) {
 	const t = useTranslations("todoList");
 	const tCommon = useTranslations("common");
+	const tImport = useTranslations("chat.importTodos");
+	const queryClient = useQueryClient();
 	const createTodoMutation = useCreateTodo();
+	const fileInputRef = useRef<HTMLInputElement | null>(null);
+	const filesRef = useRef<UploadFileItem[]>([]);
+	const planIdRef = useRef<string | null>(null);
+	const promptAppliedRef = useRef(false);
 	const [inputText, setInputText] = useState("");
 	const [isParsing, setIsParsing] = useState(false);
+	const [isPlanning, setIsPlanning] = useState(false);
+	const [isCreatingPlan, setIsCreatingPlan] = useState(false);
 	const [parseResult, setParseResult] = useState<AgentParseTaskResponse | null>(
 		null,
 	);
+	const [files, setFiles] = useState<UploadFileItem[]>([]);
+	const [planItems, setPlanItems] = useState<AttachmentPlanDraft[]>([]);
+	const [planId, setPlanId] = useState<string | null>(null);
+	const [uploadError, setUploadError] = useState<string | null>(null);
+	const [successMessage, setSuccessMessage] = useState<string | null>(null);
+	const [scheduleSummary, setScheduleSummary] = useState<string | null>(null);
 	const [taskTitle, setTaskTitle] = useState("");
 	const [priority, setPriority] = useState<TodoPriority>("none");
 	const [dueLocal, setDueLocal] = useState("");
 	const [duration, setDuration] = useState("");
 	const [description, setDescription] = useState("");
 
-	const resetState = () => {
+	useEffect(() => {
+		filesRef.current = files;
+	}, [files]);
+
+	useEffect(() => {
+		planIdRef.current = planId;
+	}, [planId]);
+
+	useEffect(() => {
+		return () => {
+			revokePreviewUrls(filesRef.current);
+			const currentPlanId = planIdRef.current;
+			if (currentPlanId) {
+				void fetch(`/api/agent/attachment-plan/${currentPlanId}`, {
+					method: "DELETE",
+				}).catch(() => undefined);
+			}
+		};
+	}, []);
+
+	const clearRemotePlan = useCallback((currentPlanId: string | null) => {
+		if (!currentPlanId) return;
+		void fetch(`/api/agent/attachment-plan/${currentPlanId}`, {
+			method: "DELETE",
+		}).catch(() => undefined);
+	}, []);
+
+	const clearAttachmentState = useCallback(() => {
+		revokePreviewUrls(filesRef.current);
+		clearRemotePlan(planIdRef.current);
+		setFiles([]);
+		setPlanItems([]);
+		setPlanId(null);
+		setUploadError(null);
+		setSuccessMessage(null);
+		setScheduleSummary(null);
+		promptAppliedRef.current = false;
+		if (fileInputRef.current) fileInputRef.current.value = "";
+	}, [clearRemotePlan]);
+
+	const resetState = useCallback(() => {
 		setInputText("");
 		setParseResult(null);
+		clearAttachmentState();
 		setTaskTitle("");
 		setPriority("none");
 		setDueLocal("");
 		setDuration("");
 		setDescription("");
-	};
+	}, [clearAttachmentState]);
 
-	const handleClose = () => {
+	const handleClose = useCallback(() => {
 		resetState();
 		onClose();
-	};
+	}, [onClose, resetState]);
+
+	const appendDefaultPrompt = useCallback(
+		(selectedFiles: File[]) => {
+			if (promptAppliedRef.current) return;
+			const prompt = tImport("promptTemplate", {
+				files: selectedFiles.map((file) => file.name).join(", "),
+			});
+			const current = inputText.trim();
+			setInputText(current ? `${inputText.trimEnd()}\n\n${prompt}` : prompt);
+			promptAppliedRef.current = true;
+		},
+		[inputText, tImport],
+	);
+
+	const queueFiles = useCallback(
+		(selectedFiles: File[]) => {
+			if (selectedFiles.length === 0) return;
+			if (filesRef.current.length + selectedFiles.length > MAX_IMPORT_FILES) {
+				setUploadError(tImport("tooManyFiles"));
+				return;
+			}
+			const oversized = selectedFiles.find(
+				(file) => file.size > MAX_IMPORT_FILE_BYTES,
+			);
+			if (oversized) {
+				setUploadError(tImport("sizeLimit"));
+				return;
+			}
+
+			const uploadItems = selectedFiles.map((file) => ({
+				id: makeClientId(),
+				name: file.name,
+				type: file.type,
+				size: file.size,
+				status: "ready" as const,
+				message: tImport("ready"),
+				previewUrl: file.type.startsWith("image/")
+					? URL.createObjectURL(file)
+					: undefined,
+				file,
+			}));
+			setFiles((current) => [...current, ...uploadItems]);
+			setPlanItems([]);
+			setPlanId((currentPlanId) => {
+				clearRemotePlan(currentPlanId);
+				return null;
+			});
+			setParseResult(null);
+			setUploadError(null);
+			setSuccessMessage(null);
+			setScheduleSummary(null);
+			appendDefaultPrompt(selectedFiles);
+			if (fileInputRef.current) fileInputRef.current.value = "";
+		},
+		[appendDefaultPrompt, clearRemotePlan, tImport],
+	);
+
+	const handleFileChange = useCallback(
+		(event: React.ChangeEvent<HTMLInputElement>) => {
+			queueFiles(Array.from(event.target.files ?? []));
+		},
+		[queueFiles],
+	);
+
+	const removeFile = useCallback((fileId: string) => {
+		const target = filesRef.current.find((file) => file.id === fileId);
+		if (target?.previewUrl) URL.revokeObjectURL(target.previewUrl);
+		setFiles((current) => current.filter((file) => file.id !== fileId));
+		if (typeof target?.sourceIndex === "number") {
+			setPlanItems((current) =>
+				current.filter(
+					(item) => !item.sourceFileIndices.includes(target.sourceIndex ?? -1),
+				),
+			);
+		}
+	}, []);
+
+	const updatePlanItem = useCallback(
+		(itemId: string, patch: Partial<AttachmentPlanDraft>) => {
+			setPlanItems((current) =>
+				current.map((item) =>
+					item.id === itemId ? { ...item, ...patch } : item,
+				),
+			);
+		},
+		[],
+	);
+
+	const submitAttachmentPlan = useCallback(async () => {
+		const currentFiles = filesRef.current;
+		const prompt = inputText.trim();
+		if (currentFiles.length === 0) return false;
+		if (!prompt) {
+			setUploadError(tImport("emptyPrompt"));
+			return true;
+		}
+
+		setIsPlanning(true);
+		setUploadError(null);
+		setSuccessMessage(null);
+		setScheduleSummary(null);
+		setPlanItems([]);
+		setParseResult(null);
+		clearRemotePlan(planIdRef.current);
+		setPlanId(null);
+		setFiles((current) =>
+			current.map((file, index) => ({
+				...file,
+				status: "planning",
+				message: tImport("planning"),
+				sourceIndex: index,
+			})),
+		);
+
+		const formData = new FormData();
+		for (const file of currentFiles) {
+			formData.append("files", file.file);
+		}
+		formData.append("prompt", prompt);
+		formData.append("reference_time", new Date().toISOString());
+		formData.append("planning_start", new Date().toISOString());
+
+		try {
+			const response = await fetch("/api/agent/attachment-plan", {
+				method: "POST",
+				body: formData,
+			});
+			if (!response.ok) {
+				throw new Error(await parseApiError(response));
+			}
+			const data = (await response.json()) as AttachmentPlanApiResponse;
+			const plannedItems = data.proposed_todos.map(toPlanDraft);
+			setPlanId(data.plan_id);
+			setPlanItems(plannedItems);
+			setScheduleSummary(data.schedule_summary || null);
+			setFiles((current) =>
+				current.map((item, index) => {
+					const result = data.file_results[index];
+					return {
+						...item,
+						sourceIndex: index,
+						status: result?.status === "failed" ? "failed" : "planned",
+						message:
+							result?.message ||
+							(result?.error_code ? result.error_code : tImport("planned")),
+					};
+				}),
+			);
+			if (plannedItems.length === 0) {
+				setUploadError(tImport("noPlanTodos"));
+			} else {
+				setSuccessMessage(tImport("planSuccess", { count: plannedItems.length }));
+			}
+		} catch (planErr) {
+			const message = planErr instanceof Error ? planErr.message : String(planErr);
+			setUploadError(tImport("planFailed", { error: message }));
+			setFiles((current) =>
+				current.map((item) => ({
+					...item,
+					status: "failed",
+					message: tImport("failed"),
+				})),
+			);
+		} finally {
+			setIsPlanning(false);
+		}
+		return true;
+	}, [clearRemotePlan, inputText, tImport]);
+
+	const confirmAttachmentCreate = useCallback(async () => {
+		const validItems = planItems.filter((item) => item.title.trim());
+		if (!planId || validItems.length === 0) {
+			setUploadError(tImport("emptyTaskTitle"));
+			return;
+		}
+
+		setIsCreatingPlan(true);
+		setUploadError(null);
+		try {
+			const response = await fetch(
+				`/api/agent/attachment-plan/${planId}/confirm`,
+				{
+					method: "POST",
+					headers: { "Content-Type": "application/json" },
+					body: JSON.stringify({
+						proposed_todos: validItems.map(toApiTodo),
+					}),
+				},
+			);
+			if (!response.ok) {
+				throw new Error(await parseApiError(response));
+			}
+			const data = (await response.json()) as AttachmentPlanConfirmResponse;
+			toastSuccess(tImport("createSuccess", { count: data.created_todos.length }));
+			void queryClient.invalidateQueries({ queryKey: queryKeys.todos.all });
+			handleClose();
+		} catch (createErr) {
+			const message =
+				createErr instanceof Error ? createErr.message : String(createErr);
+			setUploadError(tImport("createFailed", { error: message }));
+		} finally {
+			setIsCreatingPlan(false);
+		}
+	}, [handleClose, planId, planItems, queryClient, tImport]);
 
 	const handleParse = async () => {
+		const handledByAttachmentPlan = await submitAttachmentPlan();
+		if (handledByAttachmentPlan) return;
+
 		const text = inputText.trim();
 		if (!text) {
 			toastError(t("agentInputRequired"));
@@ -194,42 +476,91 @@ export function NaturalLanguageTodoModal({
 				</div>
 
 				<div className="flex-1 overflow-y-auto p-4">
+					<input
+						ref={fileInputRef}
+						type="file"
+						multiple
+						accept={SUPPORTED_IMPORT_ACCEPT}
+						className="hidden"
+						onChange={handleFileChange}
+					/>
 					<div className="space-y-4">
 						<div className="space-y-2">
-							<label
-								htmlFor="agent-natural-language-input"
-								className="text-sm font-medium text-foreground"
-							>
-								{t("agentInputLabel")}
-							</label>
+							<div className="flex items-center justify-between gap-3">
+								<label
+									htmlFor="agent-natural-language-input"
+									className="text-sm font-medium text-foreground"
+								>
+									{files.length > 0
+										? t("agentPlanPromptLabel")
+										: t("agentInputLabel")}
+								</label>
+								<button
+									type="button"
+									onClick={() => fileInputRef.current?.click()}
+									disabled={isParsing || isPlanning || isCreatingPlan}
+									aria-label={t("agentAttachFiles")}
+									className={cn(
+										"inline-flex items-center gap-1.5 rounded-md border border-input bg-background px-2.5 py-1.5 text-xs font-medium text-foreground transition-colors",
+										"hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50",
+									)}
+								>
+									<Paperclip className="h-3.5 w-3.5" />
+									{t("agentAttachFiles")}
+								</button>
+							</div>
 							<textarea
 								id="agent-natural-language-input"
 								value={inputText}
 								onChange={(event) => setInputText(event.target.value)}
-								placeholder={t("agentInputPlaceholder")}
+								placeholder={
+									files.length > 0
+										? t("agentPlanPromptPlaceholder")
+										: t("agentInputPlaceholder")
+								}
 								className="min-h-[96px] w-full resize-none rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-								maxLength={500}
+								maxLength={files.length > 0 ? 2000 : 500}
 							/>
 							<div className="flex items-center justify-between text-xs text-muted-foreground">
-								<span>{inputText.length}/500</span>
+								<span>{inputText.length}/{files.length > 0 ? 2000 : 500}</span>
 								<button
 									type="button"
 									onClick={handleParse}
-									disabled={isParsing || !inputText.trim()}
+									disabled={isParsing || isPlanning || !inputText.trim()}
 									className={cn(
 										"inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground transition-colors",
 										"hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50",
 									)}
 								>
-									{isParsing ? (
+									{isParsing || isPlanning ? (
 										<Loader2 className="h-3.5 w-3.5 animate-spin" />
 									) : (
 										<Send className="h-3.5 w-3.5" />
 									)}
-									{t("agentParse")}
+									{files.length > 0 ? t("agentParseWithAttachments") : t("agentParse")}
 								</button>
 							</div>
 						</div>
+
+						<ChatImportTodosPanel
+							files={files}
+							planItems={planItems}
+							isPlanning={isPlanning}
+							isCreating={isCreatingPlan}
+							successMessage={successMessage}
+							errorMessage={uploadError}
+							scheduleSummary={scheduleSummary}
+							onRemoveFile={removeFile}
+							onRemovePlanItem={(itemId) =>
+								setPlanItems((current) =>
+									current.filter((item) => item.id !== itemId),
+								)
+							}
+							onUpdatePlanItem={updatePlanItem}
+							onConfirmCreate={confirmAttachmentCreate}
+							onClearAll={clearAttachmentState}
+							showConfirmAction={false}
+						/>
 
 						{parseResult && (
 							<div className="space-y-4 border-t border-border pt-4">
@@ -349,19 +680,25 @@ export function NaturalLanguageTodoModal({
 					</button>
 					<button
 						type="button"
-						onClick={handleCreate}
-						disabled={!parseResult || createTodoMutation.isPending}
+						onClick={planItems.length > 0 ? confirmAttachmentCreate : handleCreate}
+						disabled={
+							planItems.length > 0
+								? isCreatingPlan
+								: !parseResult || createTodoMutation.isPending
+						}
 						className={cn(
 							"inline-flex items-center gap-1.5 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors",
 							"hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50",
 						)}
 					>
-						{createTodoMutation.isPending ? (
+						{createTodoMutation.isPending || isCreatingPlan ? (
 							<Loader2 className="h-4 w-4 animate-spin" />
 						) : (
 							<Check className="h-4 w-4" />
 						)}
-						{t("agentCreate")}
+						{planItems.length > 0
+							? tImport("confirmCreate", { count: planItems.length })
+							: t("agentCreate")}
 					</button>
 				</div>
 			</div>

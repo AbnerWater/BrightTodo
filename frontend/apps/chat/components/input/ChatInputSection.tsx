@@ -13,8 +13,20 @@ import {
 import { InputBox } from "@/apps/chat/components/input/InputBox";
 import { LinkedTodos } from "@/apps/chat/components/input/LinkedTodos";
 import { ToolSelector } from "@/apps/chat/components/input/ToolSelector";
+import {
+	type AttachmentPlanApiResponse,
+	type AttachmentPlanConfirmResponse,
+	MAX_IMPORT_FILE_BYTES,
+	MAX_IMPORT_FILES,
+	makeClientId,
+	parseApiError,
+	revokePreviewUrls,
+	SUPPORTED_IMPORT_ACCEPT,
+	toApiTodo,
+	toPlanDraft,
+} from "@/apps/chat/utils/attachmentPlan";
 import { queryKeys } from "@/lib/query/keys";
-import type { Todo, TodoPriority } from "@/lib/types";
+import type { Todo } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 type ChatInputSectionProps = {
@@ -36,92 +48,6 @@ type ChatInputSectionProps = {
 	onClearSelection: () => void;
 	onToggleTodo: (todoId: number) => void;
 };
-
-type AttachmentPlanApiFileResult = {
-	file_name: string;
-	status: "ready" | "failed";
-	message: string | null;
-	error_code: string | null;
-};
-
-type AttachmentPlanApiTodo = {
-	plan_item_id: string;
-	title: string;
-	description: string | null;
-	priority: TodoPriority;
-	due: string | null;
-	duration: string | null;
-	suggested_start: string | null;
-	suggested_end: string | null;
-	schedule_reason: string | null;
-	source_file_indices: number[];
-	source_files: string[];
-	source_text: string | null;
-	confidence: number;
-};
-
-type AttachmentPlanApiResponse = {
-	plan_id: string;
-	file_results: AttachmentPlanApiFileResult[];
-	proposed_todos: AttachmentPlanApiTodo[];
-	schedule_summary: string;
-};
-
-type AttachmentPlanConfirmResponse = {
-	created_todos: Array<{ id: number; name: string; status: string }>;
-};
-
-const SUPPORTED_IMPORT_ACCEPT =
-	".png,.jpg,.jpeg,.webp,.txt,.md,.markdown,.csv,.json,.pdf,.docx";
-const MAX_IMPORT_FILES = 5;
-const MAX_IMPORT_FILE_BYTES = 10 * 1024 * 1024;
-
-const makeClientId = () =>
-	typeof crypto !== "undefined" && "randomUUID" in crypto
-		? crypto.randomUUID()
-		: `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-
-const parseApiError = async (response: Response) => {
-	try {
-		const data = (await response.json()) as { message?: string; detail?: string };
-		return data.message || data.detail || `HTTP ${response.status}`;
-	} catch {
-		return `HTTP ${response.status}`;
-	}
-};
-
-const toPlanDraft = (todo: AttachmentPlanApiTodo): AttachmentPlanDraft => ({
-	id: makeClientId(),
-	planItemId: todo.plan_item_id,
-	title: todo.title,
-	priority: todo.priority,
-	due: todo.due,
-	duration: todo.duration,
-	description: todo.description,
-	suggestedStart: todo.suggested_start,
-	suggestedEnd: todo.suggested_end,
-	scheduleReason: todo.schedule_reason,
-	sourceFileIndices: todo.source_file_indices ?? [],
-	sourceFiles: todo.source_files ?? [],
-	sourceText: todo.source_text,
-	confidence: todo.confidence,
-});
-
-const toApiTodo = (item: AttachmentPlanDraft): AttachmentPlanApiTodo => ({
-	plan_item_id: item.planItemId,
-	title: item.title.trim(),
-	description: item.description,
-	priority: item.priority,
-	due: item.due,
-	duration: item.duration,
-	suggested_start: item.suggestedStart,
-	suggested_end: item.suggestedEnd,
-	schedule_reason: item.scheduleReason,
-	source_file_indices: item.sourceFileIndices,
-	source_files: item.sourceFiles,
-	source_text: item.sourceText,
-	confidence: item.confidence,
-});
 
 export function ChatInputSection({
 	locale,
@@ -170,9 +96,7 @@ export function ChatInputSection({
 
 	useEffect(() => {
 		return () => {
-			for (const file of filesRef.current) {
-				if (file.previewUrl) URL.revokeObjectURL(file.previewUrl);
-			}
+			revokePreviewUrls(filesRef.current);
 			const currentPlanId = planIdRef.current;
 			if (currentPlanId) {
 				void fetch(`/api/agent/attachment-plan/${currentPlanId}`, {
@@ -190,9 +114,7 @@ export function ChatInputSection({
 	}, []);
 
 	const clearAll = useCallback(() => {
-		for (const file of files) {
-			if (file.previewUrl) URL.revokeObjectURL(file.previewUrl);
-		}
+		revokePreviewUrls(files);
 		clearRemotePlan(planId);
 		setFiles([]);
 		setPlanItems([]);
@@ -411,9 +333,7 @@ export function ChatInputSection({
 				throw new Error(await parseApiError(response));
 			}
 			const data = (await response.json()) as AttachmentPlanConfirmResponse;
-			for (const file of files) {
-				if (file.previewUrl) URL.revokeObjectURL(file.previewUrl);
-			}
+			revokePreviewUrls(files);
 			setFiles([]);
 			setPlanItems([]);
 			setPlanId(null);
