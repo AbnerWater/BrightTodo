@@ -2,6 +2,7 @@
 import { useTranslations } from "next-intl";
 import { useState } from "react";
 import { priorityOptions } from "@/apps/todo-detail/helpers";
+import { RecurrenceEditor } from "@/components/common/RecurrenceEditor";
 import { useCreateTodo } from "@/lib/query";
 import type { CreateTodoInput, TodoPriority } from "@/lib/types";
 import { cn, getPriorityLabel } from "@/lib/utils";
@@ -20,6 +21,7 @@ export function CreateTodoForm({ onSuccess }: CreateTodoFormProps) {
 	const [tags, setTags] = useState("");
 	const [userNotes, setUserNotes] = useState("");
 	const [priority, setPriority] = useState<TodoPriority>("none");
+	const [rrule, setRrule] = useState<string | null>(null);
 
 	const handleSubmit = async (e: React.FormEvent) => {
 		e.preventDefault();
@@ -30,6 +32,7 @@ export function CreateTodoForm({ onSuccess }: CreateTodoFormProps) {
 			description: description.trim() || undefined,
 			userNotes: userNotes.trim() || undefined,
 			priority,
+			rrule,
 			tags:
 				tags
 					.split(",")
@@ -44,6 +47,7 @@ export function CreateTodoForm({ onSuccess }: CreateTodoFormProps) {
 			setTags("");
 			setUserNotes("");
 			setPriority("none");
+			setRrule(null);
 			setIsExpanded(false);
 			onSuccess?.();
 		} catch (err) {
@@ -131,6 +135,8 @@ export function CreateTodoForm({ onSuccess }: CreateTodoFormProps) {
 								))}
 							</select>
 						</div>
+
+						<RecurrenceEditor value={rrule} onChange={setRrule} />
 
 						<div>
 							<label

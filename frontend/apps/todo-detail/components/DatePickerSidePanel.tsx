@@ -1,7 +1,8 @@
 "use client";
 
-import { Bell, Calendar, Clock, Globe, Repeat } from "lucide-react";
+import { Bell, Calendar, Clock, Globe } from "lucide-react";
 import type { useTranslations } from "next-intl";
+import { RecurrenceEditor } from "@/components/common/RecurrenceEditor";
 import { ReminderOptions } from "@/components/common/ReminderOptions";
 import { cn } from "@/lib/utils";
 import { formatDateLabel } from "./datePickerUtils";
@@ -50,14 +51,6 @@ export function DatePickerSidePanel({
 	tDatePicker,
 	tReminder,
 }: DatePickerSidePanelProps) {
-	const repeatOptions = [
-		{ value: "", label: tDatePicker("repeatNone") },
-		{ value: "FREQ=DAILY", label: tDatePicker("repeatDaily") },
-		{ value: "FREQ=WEEKLY", label: tDatePicker("repeatWeekly") },
-		{ value: "FREQ=MONTHLY", label: tDatePicker("repeatMonthly") },
-		{ value: "FREQ=YEARLY", label: tDatePicker("repeatYearly") },
-	];
-
 	return (
 		<div className="border-l border-border/70 px-4 py-4 space-y-4">
 			{activeTab === "date" ? (
@@ -131,24 +124,6 @@ export function DatePickerSidePanel({
 							/>
 						</div>
 					</div>
-
-					<div className="space-y-2">
-						<span className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
-							<Repeat className="h-3.5 w-3.5" />
-							{tDatePicker("repeatLabel")}
-						</span>
-						<select
-							value={draftRrule ?? ""}
-							onChange={(event) => onRruleChange(event.target.value || null)}
-							className="w-full rounded-lg border border-border/70 bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
-						>
-							{repeatOptions.map((option) => (
-								<option key={option.value} value={option.value}>
-									{option.label}
-								</option>
-							))}
-						</select>
-					</div>
 				</div>
 			) : (
 				<div className="space-y-4">
@@ -212,6 +187,12 @@ export function DatePickerSidePanel({
 					</div>
 				</div>
 			)}
+
+			<RecurrenceEditor
+				value={draftRrule}
+				onChange={onRruleChange}
+				compact
+			/>
 
 			<div className="space-y-2">
 				<span className="flex items-center gap-2 text-xs font-medium text-muted-foreground">

@@ -306,7 +306,7 @@ export function DatePickerPopover({
 			<div
 				ref={popoverRef}
 				className={cn(
-					"pointer-events-auto w-[620px] max-w-[95vw] overflow-hidden rounded-2xl border border-border bg-popover text-popover-foreground shadow-[0_40px_80px_-40px_oklch(var(--primary)/0.5)]",
+					"pointer-events-auto max-h-[calc(100vh-32px)] w-[620px] max-w-[95vw] overflow-y-auto rounded-2xl border border-border bg-popover text-popover-foreground shadow-[0_40px_80px_-40px_oklch(var(--primary)/0.5)]",
 				)}
 				style={{ position: "absolute", left: -9999, top: -9999 }}
 			>

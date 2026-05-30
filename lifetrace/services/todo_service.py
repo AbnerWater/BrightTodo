@@ -230,6 +230,7 @@ class TodoService:
             "due",
             "deadline",
             "reminder_offsets",
+            "rrule",
             "status",
             "item_type",
         }

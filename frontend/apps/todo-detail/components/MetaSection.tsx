@@ -1,8 +1,9 @@
 "use client";
 
-import { Calendar, Flag, Tag as TagIcon } from "lucide-react";
+import { Calendar, Flag, Repeat, Tag as TagIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useEffect, useRef, useState } from "react";
+import { formatRecurrenceLabel } from "@/components/common/RecurrenceEditor";
 import type { Todo, TodoPriority, TodoStatus, UpdateTodoInput } from "@/lib/types";
 import { cn, getPriorityLabel, getStatusLabel } from "@/lib/utils";
 import {
@@ -31,6 +32,7 @@ export function MetaSection({
 }: MetaSectionProps) {
 	const tCommon = useTranslations("common");
 	const tTodoDetail = useTranslations("todoDetail");
+	const tDatePicker = useTranslations("datePicker");
 	const statusMenuRef = useRef<HTMLDivElement | null>(null);
 	const priorityMenuRef = useRef<HTMLDivElement | null>(null);
 	const scheduleButtonRef = useRef<HTMLButtonElement | null>(null);
@@ -101,6 +103,9 @@ export function MetaSection({
 			timeZone: todo.timeZone,
 			isAllDay: todo.isAllDay,
 		}) || tTodoDetail("addDeadline");
+	const recurrenceSummary = todo.rrule
+		? formatRecurrenceLabel(todo.rrule, tDatePicker)
+		: null;
 
 	return (
 		<div className="mb-6 text-sm text-muted-foreground">
@@ -222,6 +227,12 @@ export function MetaSection({
 					>
 						<Calendar className="h-3 w-3" />
 						<span className="truncate">{scheduleSummary}</span>
+						{recurrenceSummary && (
+							<span className="ml-1 inline-flex max-w-[180px] items-center gap-1 truncate rounded-md bg-muted/60 px-1.5 py-0.5 text-[11px] text-muted-foreground">
+								<Repeat className="h-3 w-3 shrink-0" />
+								<span className="truncate">{recurrenceSummary}</span>
+							</span>
+						)}
 					</button>
 					{isDatePickerOpen && (
 						<DatePickerPopover

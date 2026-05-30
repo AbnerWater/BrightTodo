@@ -128,3 +128,23 @@ def test_update_todo_time_zone_sets_tzid() -> None:
     assert repo.updated is not None
     assert repo.updated["time_zone"] == "Asia/Shanghai"
     assert repo.updated["tzid"] == "Asia/Shanghai"
+
+
+def test_create_todo_keeps_recurrence_rule() -> None:
+    repo = FakeTodoRepository()
+    service = TodoService(repo)
+
+    service.create_todo(TodoCreate(name="Weekly class", rrule="FREQ=WEEKLY;BYDAY=MO,WE"))
+
+    assert repo.created_payload is not None
+    assert repo.created_payload["rrule"] == "FREQ=WEEKLY;BYDAY=MO,WE"
+
+
+def test_update_todo_keeps_recurrence_rule() -> None:
+    repo = FakeTodoRepository()
+    service = TodoService(repo)
+
+    service.update_todo(1, TodoUpdate(rrule="FREQ=MONTHLY;BYMONTHDAY=1,15"))
+
+    assert repo.updated is not None
+    assert repo.updated["rrule"] == "FREQ=MONTHLY;BYMONTHDAY=1,15"

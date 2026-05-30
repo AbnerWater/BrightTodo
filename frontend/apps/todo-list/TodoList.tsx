@@ -46,6 +46,7 @@ export function TodoList() {
 
 	const [searchQuery, setSearchQuery] = useState("");
 	const [newTodoName, setNewTodoName] = useState("");
+	const [newTodoRrule, setNewTodoRrule] = useState<string | null>(null);
 	const [isNaturalLanguageModalOpen, setIsNaturalLanguageModalOpen] =
 		useState(false);
 	const [isCompletedCollapsed, setIsCompletedCollapsed] = useState(true);
@@ -305,11 +306,13 @@ export function TodoList() {
 
 		const input: CreateTodoInput = {
 			name: newTodoName.trim(),
+			rrule: newTodoRrule,
 		};
 
 		try {
 			await createTodo(input);
 			setNewTodoName("");
+			setNewTodoRrule(null);
 		} catch (err) {
 			console.error("Failed to create todo:", err);
 		}
@@ -361,8 +364,13 @@ export function TodoList() {
 						<NewTodoInlineForm
 							value={newTodoName}
 							onChange={setNewTodoName}
+							rrule={newTodoRrule}
+							onRruleChange={setNewTodoRrule}
 							onSubmit={handleCreateTodo}
-							onCancel={() => setNewTodoName("")}
+							onCancel={() => {
+								setNewTodoName("");
+								setNewTodoRrule(null);
+							}}
 						/>
 					</div>
 
