@@ -50,6 +50,14 @@ Packaging:
 - PRs should include: a clear description, linked issues (e.g., `Closes #123`),
   testing notes, and screenshots for UI changes. Use the `.github` PR template when available.
 
+## Development Mainline Branch
+
+- 后续开发统一在 `dev` 分支上开展，`dev` 是日常集成、测试和阶段验收的主线分支。
+- 新功能、修复、重构和文档任务都应从最新的 `dev` 创建任务分支或独立 worktree，
+  完成审查与测试后再合并回 `dev`。
+- `main` 仅作为稳定交付或发布基线使用，除非用户明确要求，不直接在 `main` 上开展开发或提交代码。
+- 当需要推送阶段成果时，优先推送 `origin/dev`；只有在准备正式交付时才考虑从 `dev` 合并到 `main`。
+
 ## Parallel Worktrees (Required for Concurrent Tasks)
 
 - When working on multiple tasks in parallel, always use `git worktree` so each task
