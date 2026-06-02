@@ -43,6 +43,8 @@
 		"format": "biome format --write ./app ./apps ./components ./electron ./lib ./scripts",
 		"check": "biome check ./app ./apps ./components ./electron ./lib ./scripts",
 		"type-check": "tsc --noEmit",
+		"test": "node --experimental-strip-types --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test tests/recurrence.test.ts tests/time.test.ts tests/todo-card-utils.test.ts",
+		"test:watch": "node --experimental-strip-types --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test --watch tests/recurrence.test.ts tests/time.test.ts tests/todo-card-utils.test.ts",
 		"api:generate": "orval",
 		"api:generate:watch": "orval --watch",
 		"electron:resolve-symlinks": "node scripts/resolve-symlinks.js",
