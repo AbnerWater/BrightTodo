@@ -55,6 +55,18 @@ class FakeDocumentLlmClient:
         return self.response_text
 
 
+class FakeDocumentLlmClientWithRawClient(FakeDocumentLlmClient):
+    model = "fake-model"
+
+    def __init__(self, response_text: str) -> None:
+        super().__init__(response_text)
+        self.raw_client_requested = False
+
+    def _get_client(self):
+        self.raw_client_requested = True
+        raise AssertionError("文件导入文本路径不应绕过统一 chat 入口")
+
+
 class FakeTodoService:
     def __init__(self) -> None:
         self.created = []
@@ -384,6 +396,16 @@ def test_import_llm_empty_duration_falls_back_to_estimate() -> None:
 
     assert response.extracted_tasks[0].task_title == "准备课程项目报告"
     assert response.extracted_tasks[0].duration == "PT2H"
+
+
+def test_document_llm_prefers_unified_chat_when_raw_client_available() -> None:
+    fake_llm = FakeDocumentLlmClientWithRawClient('{"todos":[]}')
+    service = _service(fake_llm)
+
+    result = service._call_document_llm(fake_llm, [{"role": "user", "content": "test"}])
+
+    assert result == '{"todos":[]}'
+    assert fake_llm.raw_client_requested is False
 
 
 def test_import_generic_document_has_local_fallback_task_when_llm_unavailable() -> None:

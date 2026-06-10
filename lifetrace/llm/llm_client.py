@@ -26,6 +26,11 @@ from .llm_client_query import (
     rule_based_parse,
 )
 from .llm_client_vision import vision_chat
+from .responses_compat import (
+    build_responses_input,
+    extract_responses_text,
+    is_responses_unsupported_error,
+)
 
 logger = get_logger()
 
@@ -140,23 +145,71 @@ class LLMClient:
         model: str | None = None,
         max_tokens: int | None = None,
     ) -> str:
-        """通用非流式聊天方法，返回完整文本结果。"""
+        """通用非流式聊天方法，优先使用 Responses API。"""
         if not self.is_available():
             raise RuntimeError("LLM客户端不可用，无法进行文本聊天")
 
         try:
-            client = self._get_client()
-            response = client.chat.completions.create(
-                model=model or self.model,
-                messages=cast("list[ChatCompletionMessageParam]", messages),
+            return self.responses_chat(
+                messages=messages,
                 temperature=temperature,
+                model=model,
                 max_tokens=max_tokens,
             )
-            content = response.choices[0].message.content or ""
-            return content
         except Exception as e:
-            logger.error(f"文本聊天失败: {e}")
+            if is_responses_unsupported_error(e):
+                logger.warning(f"Responses API 不可用，回退到 Chat Completions: {e}")
+                return self._chat_completions(
+                    messages=messages,
+                    temperature=temperature,
+                    model=model,
+                    max_tokens=max_tokens,
+                )
+            logger.error(f"Responses 文本聊天失败: {e}")
             raise
+
+    def responses_chat(
+        self,
+        messages: list[dict[str, str]],
+        temperature: float = 0.7,
+        model: str | None = None,
+        max_tokens: int | None = None,
+    ) -> str:
+        """使用 Responses API 执行非流式文本调用。"""
+        if not self.is_available():
+            raise RuntimeError("LLM客户端不可用，无法进行 Responses 文本聊天")
+
+        instructions, input_items = build_responses_input(cast("list[dict[str, Any]]", messages))
+        request_kwargs: dict[str, Any] = {
+            "model": model or self.model,
+            "input": input_items,
+            "temperature": temperature,
+        }
+        if instructions:
+            request_kwargs["instructions"] = instructions
+        if max_tokens is not None:
+            request_kwargs["max_output_tokens"] = max_tokens
+
+        client = self._get_client()
+        response = client.responses.create(**request_kwargs)
+        return extract_responses_text(response)
+
+    def _chat_completions(
+        self,
+        messages: list[dict[str, str]],
+        temperature: float,
+        model: str | None,
+        max_tokens: int | None,
+    ) -> str:
+        """使用 Chat Completions 作为兼容回退。"""
+        client = self._get_client()
+        response = client.chat.completions.create(
+            model=model or self.model,
+            messages=cast("list[ChatCompletionMessageParam]", messages),
+            temperature=temperature,
+            max_tokens=max_tokens,
+        )
+        return response.choices[0].message.content or ""
 
     def stream_chat(
         self,

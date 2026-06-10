@@ -7,6 +7,11 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException
 
+from lifetrace.llm.responses_compat import (
+    CHAT_COMPLETIONS_FALLBACK_MODE,
+    RESPONSES_API_MODE,
+    is_responses_unsupported_error,
+)
 from lifetrace.services.config_service import ConfigService, is_llm_configured
 from lifetrace.util.logging_config import get_logger
 from lifetrace.util.prompt_loader import get_prompt
@@ -61,13 +66,10 @@ def verify_llm_connection_on_startup():
         # 创建临时客户端进行测试
         client = OpenAI(api_key=api_key, base_url=base_url)
 
-        # 发送最小化测试请求验证认证
-        client.chat.completions.create(
-            model=model, messages=[{"role": "user", "content": "test"}], max_tokens=5
-        )
+        api_mode = _test_llm_connection_with_responses_fallback(client, model)
 
         _llm_connection_state["verified"] = True
-        logger.info("LLM 启动时连接验证成功")
+        logger.info(f"LLM 启动时连接验证成功，api_mode={api_mode}")
     except Exception as e:
         _llm_connection_state["verified"] = False
         logger.warning(f"LLM 启动时连接验证失败: {e}")
@@ -119,6 +121,24 @@ def _get_config_value(config_data: dict[str, Any], camel_key: str, snake_key: st
     return config_data.get(camel_key) or config_data.get(snake_key)
 
 
+def _test_llm_connection_with_responses_fallback(client: Any, model: str) -> str:
+    """优先使用 Responses API 验证 LLM 连接，端点不支持时回退。"""
+    try:
+        client.responses.create(model=model, input="test", max_output_tokens=5)
+        return RESPONSES_API_MODE
+    except Exception as exc:
+        if not is_responses_unsupported_error(exc):
+            raise
+        logger.warning(f"Responses API 配置验证不可用，回退到 Chat Completions: {exc}")
+
+    client.chat.completions.create(
+        model=model,
+        messages=[{"role": "user", "content": "test"}],
+        max_tokens=5,
+    )
+    return CHAT_COMPLETIONS_FALLBACK_MODE
+
+
 @router.post("/test-llm-config")
 async def test_llm_config(config_data: dict[str, str]):
     """测试LLM配置是否可用（仅验证认证）"""
@@ -150,11 +170,14 @@ async def test_llm_config(config_data: dict[str, str]):
 
         # 发送最小化测试请求验证认证
         try:
-            client.chat.completions.create(
-                model=model, messages=[{"role": "user", "content": "test"}], max_tokens=5
+            api_mode = _test_llm_connection_with_responses_fallback(client, model)
+            logger.info(f"LLM配置测试成功 - 模型: {model}, api_mode={api_mode}")
+            message = (
+                "配置验证成功"
+                if api_mode == RESPONSES_API_MODE
+                else "配置验证成功（Responses 不可用，已回退 Chat Completions）"
             )
-            logger.info(f"LLM配置测试成功 - 模型: {model}")
-            return {"success": True, "message": "配置验证成功"}
+            return {"success": True, "message": message, "api_mode": api_mode}
         except Exception as e:
             logger.error(f"LLM配置测试失败: {e} - 模型: {model}, Key前缀: {llm_key[:10]}...")
             return {"success": False, "error": str(e)}

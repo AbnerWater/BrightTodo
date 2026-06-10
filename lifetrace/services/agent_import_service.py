@@ -715,6 +715,9 @@ class AgentImportService:
         return get_llm_client()
 
     def _call_document_llm(self, llm_client: Any, messages: list[dict[str, str]]) -> str:
+        if hasattr(llm_client, "chat"):
+            return llm_client.chat(messages=messages, temperature=0.2, max_tokens=1800)
+
         if hasattr(llm_client, "_get_client") and hasattr(llm_client, "model"):
             client = llm_client._get_client()
             response = client.chat.completions.create(
@@ -726,7 +729,7 @@ class AgentImportService:
                 extra_body={"enable_thinking": False},
             )
             return response.choices[0].message.content or ""
-        return llm_client.chat(messages=messages, temperature=0.2, max_tokens=1800)
+        raise RuntimeError("文件导入 LLM 客户端不支持文本调用")
 
     def _build_document_llm_messages(
         self,
