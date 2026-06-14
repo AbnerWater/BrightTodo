@@ -7,6 +7,7 @@ import {
 	Image as ImageIcon,
 	ListChecks,
 	Loader2,
+	RefreshCw,
 	Trash2,
 	X,
 } from "lucide-react";
@@ -23,9 +24,15 @@ export type UploadFileItem = {
 	size: number;
 	status: "ready" | "planning" | "planned" | "failed";
 	message?: string;
+	rawTextPreview?: string | null;
 	previewUrl?: string;
 	sourceIndex?: number;
 	file: File;
+};
+
+export type AttachmentPlanScheduleAlternative = {
+	suggestedStart: string;
+	suggestedEnd: string;
 };
 
 export type AttachmentPlanDraft = {
@@ -39,6 +46,7 @@ export type AttachmentPlanDraft = {
 	suggestedStart: string | null;
 	suggestedEnd: string | null;
 	scheduleReason: string | null;
+	scheduleAlternatives: AttachmentPlanScheduleAlternative[];
 	sourceFileIndices: number[];
 	sourceFiles: string[];
 	sourceText: string | null;
@@ -56,6 +64,11 @@ type ChatImportTodosPanelProps = {
 	onRemoveFile: (fileId: string) => void;
 	onRemovePlanItem: (itemId: string) => void;
 	onUpdatePlanItem: (itemId: string, patch: Partial<AttachmentPlanDraft>) => void;
+	onUseAlternative?: (
+		itemId: string,
+		alternative: AttachmentPlanScheduleAlternative,
+	) => void;
+	onRetryPlan?: () => void;
 	onConfirmCreate: () => void;
 	onClearAll: () => void;
 	createMode: AttachmentPlanCreateMode;
@@ -88,6 +101,21 @@ const fromDateTimeLocalValue = (value: string) => {
 	return Number.isNaN(date.getTime()) ? null : date.toISOString();
 };
 
+const formatScheduleRange = (start: string, end: string) => {
+	const startDate = new Date(start);
+	const endDate = new Date(end);
+	if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) {
+		return `${start} - ${end}`;
+	}
+	const formatter = new Intl.DateTimeFormat("zh-CN", {
+		month: "2-digit",
+		day: "2-digit",
+		hour: "2-digit",
+		minute: "2-digit",
+	});
+	return `${formatter.format(startDate)} - ${formatter.format(endDate)}`;
+};
+
 function FileStatusIcon({ file }: { file: UploadFileItem }) {
 	if (file.status === "planning") {
 		return <Loader2 className="h-4 w-4 animate-spin text-primary" />;
@@ -112,6 +140,8 @@ export function ChatImportTodosPanel({
 	onRemoveFile,
 	onRemovePlanItem,
 	onUpdatePlanItem,
+	onUseAlternative,
+	onRetryPlan,
 	onConfirmCreate,
 	onClearAll,
 	createMode,
@@ -229,6 +259,11 @@ export function ChatImportTodosPanel({
 								{file.message && (
 									<p className="truncate text-[11px] text-muted-foreground">
 										{file.message}
+									</p>
+								)}
+								{file.rawTextPreview && (
+									<p className="truncate text-[11px] text-muted-foreground">
+										{t("rawPreview", { text: file.rawTextPreview })}
 									</p>
 								)}
 							</div>
@@ -466,13 +501,56 @@ export function ChatImportTodosPanel({
 										{item.scheduleReason}
 									</p>
 								)}
+								{!item.suggestedStart && !item.scheduleReason && (
+									<p className="text-[11px] text-amber-600 dark:text-amber-300">
+										{t("unscheduledHint")}
+									</p>
+								)}
+								{item.scheduleAlternatives.length > 0 && (
+									<div className="flex flex-wrap items-center gap-1.5">
+										<span className="text-[11px] text-muted-foreground">
+											{t("alternativesLabel")}
+										</span>
+										{item.scheduleAlternatives.map((alternative) => (
+											<button
+												key={`${alternative.suggestedStart}-${alternative.suggestedEnd}`}
+												type="button"
+												onClick={() =>
+													onUseAlternative?.(item.id, alternative)
+												}
+												disabled={isPlanning || isCreating || !onUseAlternative}
+												className="rounded-md border border-border px-2 py-1 text-[11px] text-foreground hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
+											>
+												{t("useAlternative", {
+													time: formatScheduleRange(
+														alternative.suggestedStart,
+														alternative.suggestedEnd,
+													),
+												})}
+											</button>
+										))}
+									</div>
+								)}
 							</div>
 						))}
 					</div>
 				)}
 
 				{errorMessage && (
-					<p className="text-xs text-destructive">{errorMessage}</p>
+					<div className="flex flex-wrap items-center justify-between gap-2">
+						<p className="min-w-0 text-xs text-destructive">{errorMessage}</p>
+						{onRetryPlan && (
+							<button
+								type="button"
+								onClick={onRetryPlan}
+								disabled={isPlanning || isCreating}
+								className="inline-flex h-7 items-center gap-1.5 rounded-md border border-border px-2 text-xs text-foreground hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
+							>
+								<RefreshCw className="h-3.5 w-3.5" />
+								{t("retryPlan")}
+							</button>
+						)}
+					</div>
 				)}
 				{successMessage && (
 					<p className="text-xs text-emerald-600">{successMessage}</p>

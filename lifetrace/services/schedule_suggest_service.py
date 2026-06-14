@@ -9,6 +9,7 @@ from zoneinfo import ZoneInfo
 
 from lifetrace.schemas.agent import (
     ScheduleAlternative,
+    ScheduleBlockedSlot,
     ScheduleConstraint,
     ScheduleSuggestion,
     ScheduleSuggestRequest,
@@ -103,7 +104,7 @@ class ScheduleSuggestService:
 
         daily_limit_minutes = self._normalize_daily_limit(request.daily_available_hours)
         constraints = self._normalize_constraints(request.schedule_constraints)
-        occupied_slots: list[TimeSlot] = []
+        occupied_slots = self._normalize_blocked_slots(request.blocked_slots)
         suggestions: list[ScheduleSuggestion] = []
         unscheduled_todos: list[int] = []
 
@@ -201,6 +202,16 @@ class ScheduleSuggestService:
                     label=constraint.label,
                 )
             )
+        return normalized
+
+    def _normalize_blocked_slots(self, blocked_slots: list[ScheduleBlockedSlot]) -> list[TimeSlot]:
+        normalized = []
+        for slot in blocked_slots:
+            start = self._normalize_datetime(slot.start)
+            end = self._normalize_datetime(slot.end)
+            if end <= start:
+                raise ScheduleSuggestError("INVALID_INPUT", "占用时段结束时间必须晚于开始时间")
+            normalized.append(TimeSlot(start=start, end=end))
         return normalized
 
     def _parse_clock(self, value: str) -> time:
@@ -329,6 +340,6 @@ class ScheduleSuggestService:
                 "，当天需要完成" if days_left == 0 else f"，距截止日期约 {days_left} 天"
             )
         return (
-            f"{weekday} {slot.start:%H:%M}-{slot.end:%H:%M} 无课程冲突，"
+            f"{weekday} {slot.start:%H:%M}-{slot.end:%H:%M} 无课程/已有待办冲突，"
             f"按{priority}排序安排{deadline_text}"
         )

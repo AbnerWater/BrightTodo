@@ -7,6 +7,7 @@ import type React from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
 	type AttachmentPlanDraft,
+	type AttachmentPlanScheduleAlternative,
 	ChatImportTodosPanel,
 	type UploadFileItem,
 } from "@/apps/chat/components/input/ChatImportTodosPanel";
@@ -17,6 +18,7 @@ import {
 	type AttachmentPlanApiResponse,
 	type AttachmentPlanConfirmResponse,
 	type AttachmentPlanCreateMode,
+	buildBlockedSlotsFromTodos,
 	MAX_IMPORT_FILE_BYTES,
 	MAX_IMPORT_FILES,
 	makeClientId,
@@ -26,6 +28,7 @@ import {
 	toApiTodo,
 	toPlanDraft,
 } from "@/apps/chat/utils/attachmentPlan";
+import { useTodos } from "@/lib/query";
 import { queryKeys } from "@/lib/query/keys";
 import type { Todo } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -72,6 +75,7 @@ export function ChatInputSection({
 	const tPage = useTranslations("page");
 	const tImport = useTranslations("chat.importTodos");
 	const queryClient = useQueryClient();
+	const { data: todos = [] } = useTodos();
 	const modeMenuRef = useRef<HTMLDivElement | null>(null);
 	const fileInputRef = useRef<HTMLInputElement | null>(null);
 	const filesRef = useRef<UploadFileItem[]>([]);
@@ -233,6 +237,17 @@ export function ChatInputSection({
 		[],
 	);
 
+	const usePlanAlternative = useCallback(
+		(itemId: string, alternative: AttachmentPlanScheduleAlternative) => {
+			updatePlanItem(itemId, {
+				suggestedStart: alternative.suggestedStart,
+				suggestedEnd: alternative.suggestedEnd,
+				scheduleReason: tImport("alternativeApplied"),
+			});
+		},
+		[tImport, updatePlanItem],
+	);
+
 	const submitAttachmentPlan = useCallback(async () => {
 		const currentFiles = filesRef.current;
 		if (currentFiles.length === 0) {
@@ -265,9 +280,14 @@ export function ChatInputSection({
 		for (const file of currentFiles) {
 			formData.append("files", file.file);
 		}
+		const planningStart = new Date();
+		const blockedSlots = buildBlockedSlotsFromTodos(todos, planningStart);
 		formData.append("prompt", prompt);
-		formData.append("reference_time", new Date().toISOString());
-		formData.append("planning_start", new Date().toISOString());
+		formData.append("reference_time", planningStart.toISOString());
+		formData.append("planning_start", planningStart.toISOString());
+		if (blockedSlots.length > 0) {
+			formData.append("blocked_slots_json", JSON.stringify(blockedSlots));
+		}
 		if (conversationId) {
 			formData.append("conversation_id", conversationId);
 		}
@@ -299,6 +319,7 @@ export function ChatInputSection({
 						message:
 							result?.message ||
 							(result?.error_code ? result.error_code : tImport("planned")),
+						rawTextPreview: result?.raw_text_preview ?? null,
 					};
 				}),
 			);
@@ -330,6 +351,7 @@ export function ChatInputSection({
 		onSend,
 		planId,
 		tImport,
+		todos,
 	]);
 
 	const confirmCreate = useCallback(async () => {
@@ -459,6 +481,8 @@ export function ChatInputSection({
 					setPlanItems((current) => current.filter((item) => item.id !== itemId))
 				}
 				onUpdatePlanItem={updatePlanItem}
+				onUseAlternative={usePlanAlternative}
+				onRetryPlan={submitAttachmentPlan}
 				onConfirmCreate={confirmCreate}
 				onClearAll={clearAll}
 				createMode={createMode}

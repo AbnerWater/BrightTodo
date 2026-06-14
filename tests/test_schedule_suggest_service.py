@@ -5,6 +5,7 @@ from datetime import datetime
 import pytest
 
 from lifetrace.schemas.agent import (
+    ScheduleBlockedSlot,
     ScheduleConstraint,
     ScheduleSuggestRequest,
     ScheduleSuggestTodo,
@@ -53,6 +54,38 @@ def test_schedule_suggest_avoids_course_constraint() -> None:
     assert result.unscheduled_todos == []
     assert result.suggestions[0].suggested_start.isoformat() == "2026-05-19T12:00:00+08:00"
     assert result.suggestions[0].suggested_end.isoformat() == "2026-05-19T14:00:00+08:00"
+
+
+def test_schedule_suggest_avoids_blocked_slots_and_returns_alternatives() -> None:
+    request = ScheduleSuggestRequest(
+        todos=[
+            ScheduleSuggestTodo(
+                id=101,
+                name="完成操作系统作业",
+                priority=TodoPriority.HIGH,
+                duration="PT1H",
+            )
+        ],
+        blocked_slots=[
+            ScheduleBlockedSlot(
+                start=_dt("2026-05-19T08:00:00+08:00"),
+                end=_dt("2026-05-19T09:00:00+08:00"),
+                label="已有待办：晨会",
+            )
+        ],
+        planning_start=_dt("2026-05-19T08:00:00+08:00"),
+        planning_end=_dt("2026-05-19T12:00:00+08:00"),
+        daily_available_hours=6,
+    )
+
+    result = ScheduleSuggestService().suggest(request)
+
+    assert result.suggestions[0].suggested_start.isoformat() == "2026-05-19T09:00:00+08:00"
+    assert result.suggestions[0].suggested_end.isoformat() == "2026-05-19T10:00:00+08:00"
+    assert result.suggestions[0].alternatives[0].suggested_start.isoformat() == (
+        "2026-05-19T09:30:00+08:00"
+    )
+    assert "已有待办冲突" in result.suggestions[0].reason
 
 
 def test_schedule_suggest_orders_high_priority_first() -> None:
@@ -250,6 +283,25 @@ def test_schedule_suggest_rejects_invalid_duration() -> None:
             planning_start=_dt("2026-05-19T08:00:00+08:00"),
             planning_end=_dt("2026-05-19T22:00:00+08:00"),
             daily_available_hours=0,
+        ),
+        ScheduleSuggestRequest(
+            todos=[
+                ScheduleSuggestTodo(
+                    id=101,
+                    name="完成操作系统作业",
+                    priority=TodoPriority.HIGH,
+                    duration="PT1H",
+                )
+            ],
+            blocked_slots=[
+                ScheduleBlockedSlot(
+                    start=_dt("2026-05-19T10:00:00+08:00"),
+                    end=_dt("2026-05-19T09:00:00+08:00"),
+                    label="错误占用",
+                )
+            ],
+            planning_start=_dt("2026-05-19T08:00:00+08:00"),
+            planning_end=_dt("2026-05-19T22:00:00+08:00"),
         ),
     ],
 )

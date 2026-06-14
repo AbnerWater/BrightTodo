@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from types import SimpleNamespace
 from typing import TYPE_CHECKING
 
@@ -163,6 +164,13 @@ def test_schedule_suggest_endpoint_returns_contract_fields() -> None:
                     "start_time": "10:00",
                     "end_time": "12:00",
                     "label": "操作系统课",
+                }
+            ],
+            "blocked_slots": [
+                {
+                    "start": "2026-05-19T14:00:00+08:00",
+                    "end": "2026-05-19T15:00:00+08:00",
+                    "label": "已有待办：复习",
                 }
             ],
             "planning_start": "2026-05-19T10:00:00+08:00",
@@ -373,6 +381,16 @@ def test_attachment_plan_endpoint_returns_confirmable_schedule(
             "prompt": "请根据附件生成日程规划",
             "reference_time": "2026-05-30T10:00:00+08:00",
             "planning_start": "2026-05-30T10:00:00+08:00",
+            "planning_end": "2026-05-30T16:00:00+08:00",
+            "blocked_slots_json": json.dumps(
+                [
+                    {
+                        "start": "2026-05-30T10:00:00+08:00",
+                        "end": "2026-05-30T12:00:00+08:00",
+                        "label": "已有待办：课程",
+                    }
+                ]
+            ),
         },
     )
 
@@ -382,6 +400,30 @@ def test_attachment_plan_endpoint_returns_confirmable_schedule(
     assert data["file_results"][0]["status"] == "ready"
     assert data["proposed_todos"][0]["title"] == "准备课程项目展示"
     assert data["proposed_todos"][0]["duration"] == "PT2H"
+    assert data["proposed_todos"][0]["suggested_start"] == "2026-05-30T12:00:00+08:00"
+    assert data["proposed_todos"][0]["schedule_alternatives"]
+
+
+def test_attachment_plan_endpoint_rejects_invalid_blocked_slots_json() -> None:
+    client = _client_with_todo_service(FakeTodoService())
+
+    response = client.post(
+        "/api/agent/attachment-plan",
+        files={
+            "files": (
+                "course.txt",
+                b"Course project requires presentation.",
+                "text/plain",
+            )
+        },
+        data={
+            "prompt": "请根据附件生成日程规划",
+            "blocked_slots_json": "not-json",
+        },
+    )
+
+    assert response.status_code == HTTP_BAD_REQUEST
+    assert response.json()["error_code"] == "INVALID_INPUT"
 
 
 def test_text_plan_endpoint_returns_confirmable_schedule(
@@ -403,6 +445,14 @@ def test_text_plan_endpoint_returns_confirmable_schedule(
             "prompt": "请把课程项目展示拆成可执行待办",
             "reference_time": "2026-05-30T10:00:00+08:00",
             "planning_start": "2026-05-30T10:00:00+08:00",
+            "planning_end": "2026-05-30T16:00:00+08:00",
+            "blocked_slots": [
+                {
+                    "start": "2026-05-30T10:00:00+08:00",
+                    "end": "2026-05-30T12:00:00+08:00",
+                    "label": "已有待办：课程",
+                }
+            ],
         },
     )
 
@@ -412,6 +462,7 @@ def test_text_plan_endpoint_returns_confirmable_schedule(
     assert data["file_results"] == []
     assert data["proposed_todos"][0]["title"] == "准备课程项目展示"
     assert data["proposed_todos"][0]["source_file_indices"] == []
+    assert data["proposed_todos"][0]["suggested_start"] == "2026-05-30T12:00:00+08:00"
 
 
 def test_attachment_plan_confirm_creates_draft_and_ai_attachment(

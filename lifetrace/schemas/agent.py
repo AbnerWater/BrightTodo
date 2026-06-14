@@ -38,6 +38,12 @@ class AgentTextPlanRequest(BaseModel):
     daily_available_hours: int | None = Field(
         None, ge=1, le=16, description="每日可用学习/工作时长"
     )
+    schedule_constraints: list["ScheduleConstraint"] = Field(
+        default_factory=list, description="不可安排任务的周期课程或日程约束"
+    )
+    blocked_slots: list["ScheduleBlockedSlot"] = Field(
+        default_factory=list, description="已有待办等绝对占用时段"
+    )
 
 
 class ScheduleSuggestTodo(BaseModel):
@@ -59,12 +65,23 @@ class ScheduleConstraint(BaseModel):
     label: str | None = Field(None, description="约束标签")
 
 
+class ScheduleBlockedSlot(BaseModel):
+    """智能编排已有占用时段"""
+
+    start: datetime = Field(..., description="占用开始时间")
+    end: datetime = Field(..., description="占用结束时间")
+    label: str | None = Field(None, description="占用来源标签")
+
+
 class ScheduleSuggestRequest(BaseModel):
     """智能日程编排请求"""
 
     todos: list[ScheduleSuggestTodo] = Field(..., description="需要编排的待办列表")
     schedule_constraints: list[ScheduleConstraint] = Field(
         default_factory=list, description="不可安排任务的课程或日程约束"
+    )
+    blocked_slots: list[ScheduleBlockedSlot] = Field(
+        default_factory=list, description="已有待办等绝对占用时段"
     )
     planning_start: datetime | None = Field(None, description="编排开始时间")
     planning_end: datetime | None = Field(None, description="编排结束时间")
@@ -170,6 +187,9 @@ class AttachmentPlanTodo(BaseModel):
     suggested_start: datetime | None = Field(None, description="建议开始时间")
     suggested_end: datetime | None = Field(None, description="建议结束时间")
     schedule_reason: str | None = Field(None, description="建议时段理由")
+    schedule_alternatives: list[ScheduleAlternative] = Field(
+        default_factory=list, description="备选执行时段"
+    )
     source_file_indices: list[int] = Field(default_factory=list, description="来源文件序号")
     source_files: list[str] = Field(default_factory=list, description="来源文件名")
     source_text: str | None = Field(None, description="支撑该任务的原文或图片内容描述")

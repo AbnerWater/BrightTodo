@@ -12,6 +12,7 @@ from openpyxl import Workbook
 from pptx import Presentation
 from pptx.util import Inches
 
+from lifetrace.schemas.agent import ScheduleBlockedSlot
 from lifetrace.schemas.todo import TodoPriority, TodoStatus
 from lifetrace.services.agent_attachment_plan_service import (
     AgentAttachmentPlanService,
@@ -303,6 +304,38 @@ def test_attachment_plan_accepts_excel_attachment(
     assert "Course project requires" in fake_llm.messages[1]["content"]
 
 
+def test_attachment_plan_avoids_blocked_slots_and_returns_alternatives(
+    tmp_path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        "lifetrace.services.agent_attachment_plan_service.get_attachments_dir",
+        lambda: tmp_path,
+    )
+    service = AgentAttachmentPlanService(llm_client=FakeTextLlmClient(_plan_response()))
+
+    response = service.create_plan(
+        files=[_txt_file("Course project requires a group presentation and final report.")],
+        prompt="请根据附件生成日程规划",
+        reference_time=_reference_time(),
+        planning_start=_reference_time(),
+        planning_end=datetime.fromisoformat("2026-05-30T16:00:00+08:00"),
+        daily_available_hours=6,
+        blocked_slots=[
+            ScheduleBlockedSlot(
+                start=_reference_time(),
+                end=datetime.fromisoformat("2026-05-30T12:00:00+08:00"),
+                label="已有待办：课程",
+            )
+        ],
+    )
+
+    todo = response.proposed_todos[0]
+    assert todo.suggested_start is not None
+    assert todo.suggested_start.isoformat() == "2026-05-30T12:00:00+08:00"
+    assert todo.schedule_alternatives
+    assert "已有待办冲突" in (todo.schedule_reason or "")
+
+
 def test_attachment_plan_accepts_presentation_attachment(
     tmp_path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -411,6 +444,36 @@ def test_text_plan_without_files_can_confirm_nested_todos(
     ]
     assert fake_todo_service.created[1].parent_todo_id == 1
     assert fake_todo_service.attachments == []
+
+
+def test_text_plan_uses_blocked_slots_for_schedule_suggestion(
+    tmp_path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        "lifetrace.services.agent_attachment_plan_service.get_attachments_dir",
+        lambda: tmp_path,
+    )
+    service = AgentAttachmentPlanService(llm_client=FakeTextLlmClient(_plan_response()))
+
+    response = service.create_text_plan(
+        prompt="请把课程项目拆成可执行计划",
+        reference_time=_reference_time(),
+        planning_start=_reference_time(),
+        planning_end=datetime.fromisoformat("2026-05-30T16:00:00+08:00"),
+        daily_available_hours=6,
+        blocked_slots=[
+            ScheduleBlockedSlot(
+                start=_reference_time(),
+                end=datetime.fromisoformat("2026-05-30T12:00:00+08:00"),
+                label="已有待办：课程",
+            )
+        ],
+    )
+
+    assert response.proposed_todos[0].suggested_start is not None
+    assert response.proposed_todos[0].suggested_start.isoformat() == (
+        "2026-05-30T12:00:00+08:00"
+    )
 
 
 def test_confirm_plan_omits_duration_when_fixed_time_slot_exists(

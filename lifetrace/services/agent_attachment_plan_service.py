@@ -7,7 +7,7 @@ import json
 import re
 import shutil
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import UTC
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal, cast
@@ -20,6 +20,8 @@ from lifetrace.schemas.agent import (
     AttachmentPlanFileResult,
     AttachmentPlanResponse,
     AttachmentPlanTodo,
+    ScheduleBlockedSlot,
+    ScheduleConstraint,
     ScheduleSuggestRequest,
     ScheduleSuggestTodo,
 )
@@ -87,6 +89,17 @@ class _ConfirmPlanContext:
     copied_paths: list[Path]
 
 
+@dataclass(frozen=True)
+class AttachmentPlanScheduleOptions:
+    """附件规划中的时间编排选项。"""
+
+    planning_start: datetime | None = None
+    planning_end: datetime | None = None
+    daily_available_hours: int | None = None
+    schedule_constraints: list[ScheduleConstraint] = field(default_factory=list)
+    blocked_slots: list[ScheduleBlockedSlot] = field(default_factory=list)
+
+
 class AttachmentPlanError(Exception):
     """附件规划接口契约错误。"""
 
@@ -124,9 +137,8 @@ class AgentAttachmentPlanService:
         files: list[AgentImportFile],
         prompt: str,
         reference_time: datetime | None,
-        planning_start: datetime | None,
-        planning_end: datetime | None,
-        daily_available_hours: int | None,
+        schedule_options: AttachmentPlanScheduleOptions | None = None,
+        **schedule_kwargs: Any,
     ) -> AttachmentPlanResponse:
         """基于附件和用户确认的 prompt 生成待确认日程规划。"""
         start = time.perf_counter()
@@ -139,6 +151,10 @@ class AgentAttachmentPlanService:
         llm_client = self._get_llm_client()
         if not llm_client.is_available():
             raise AttachmentPlanError(503, "LLM_UNAVAILABLE", "LLM 服务当前不可用，请检查配置")
+        resolved_schedule_options = self._resolve_schedule_options(
+            schedule_options,
+            schedule_kwargs,
+        )
 
         plan_id = uuid4().hex
         plan_dir = self._plan_dir(plan_id)
@@ -172,9 +188,11 @@ class AgentAttachmentPlanService:
             proposed_todos, summary = self._parse_plan_response(response_text, stored_files)
             proposed_todos, schedule_summary = self._apply_schedule_suggestions(
                 proposed_todos=proposed_todos,
-                planning_start=planning_start,
-                planning_end=planning_end,
-                daily_available_hours=daily_available_hours,
+                planning_start=resolved_schedule_options.planning_start,
+                planning_end=resolved_schedule_options.planning_end,
+                daily_available_hours=resolved_schedule_options.daily_available_hours,
+                schedule_constraints=resolved_schedule_options.schedule_constraints,
+                blocked_slots=resolved_schedule_options.blocked_slots,
             )
             if summary and schedule_summary:
                 schedule_summary = f"{summary}\n{schedule_summary}"
@@ -200,6 +218,36 @@ class AgentAttachmentPlanService:
             shutil.rmtree(plan_dir, ignore_errors=True)
             raise
 
+    def _resolve_schedule_options(
+        self,
+        schedule_options: AttachmentPlanScheduleOptions | None,
+        schedule_kwargs: dict[str, Any],
+    ) -> AttachmentPlanScheduleOptions:
+        """兼容旧关键字调用并统一为时间编排选项。"""
+        if not schedule_kwargs:
+            return schedule_options or AttachmentPlanScheduleOptions()
+        if schedule_options is not None:
+            raise TypeError("schedule_options 不能与旧时间编排参数同时使用")
+
+        allowed_keys = {
+            "planning_start",
+            "planning_end",
+            "daily_available_hours",
+            "schedule_constraints",
+            "blocked_slots",
+        }
+        unknown_keys = sorted(set(schedule_kwargs) - allowed_keys)
+        if unknown_keys:
+            raise TypeError(f"未知时间编排参数: {', '.join(unknown_keys)}")
+
+        return AttachmentPlanScheduleOptions(
+            planning_start=schedule_kwargs.get("planning_start"),
+            planning_end=schedule_kwargs.get("planning_end"),
+            daily_available_hours=schedule_kwargs.get("daily_available_hours"),
+            schedule_constraints=schedule_kwargs.get("schedule_constraints") or [],
+            blocked_slots=schedule_kwargs.get("blocked_slots") or [],
+        )
+
     def create_text_plan(
         self,
         *,
@@ -208,6 +256,8 @@ class AgentAttachmentPlanService:
         planning_start: datetime | None,
         planning_end: datetime | None,
         daily_available_hours: int | None,
+        schedule_constraints: list[ScheduleConstraint] | None = None,
+        blocked_slots: list[ScheduleBlockedSlot] | None = None,
     ) -> AttachmentPlanResponse:
         """基于自然语言生成待确认日程规划。"""
         start = time.perf_counter()
@@ -246,6 +296,8 @@ class AgentAttachmentPlanService:
                 planning_start=planning_start,
                 planning_end=planning_end,
                 daily_available_hours=daily_available_hours,
+                schedule_constraints=schedule_constraints or [],
+                blocked_slots=blocked_slots or [],
             )
             if summary and schedule_summary:
                 schedule_summary = f"{summary}\n{schedule_summary}"
@@ -823,6 +875,8 @@ class AgentAttachmentPlanService:
         planning_start: datetime | None,
         planning_end: datetime | None,
         daily_available_hours: int | None,
+        schedule_constraints: list[ScheduleConstraint],
+        blocked_slots: list[ScheduleBlockedSlot],
     ) -> tuple[list[AttachmentPlanTodo], str]:
         if not proposed_todos:
             return [], "LLM 未返回可确认的日程项。"
@@ -838,6 +892,8 @@ class AgentAttachmentPlanService:
                 )
                 for index, todo in enumerate(proposed_todos)
             ],
+            schedule_constraints=schedule_constraints,
+            blocked_slots=blocked_slots,
             planning_start=planning_start,
             planning_end=planning_end,
             daily_available_hours=daily_available_hours or DEFAULT_DAILY_AVAILABLE_HOURS,
@@ -860,6 +916,7 @@ class AgentAttachmentPlanService:
                         "suggested_start": suggestion.suggested_start,
                         "suggested_end": suggestion.suggested_end,
                         "schedule_reason": suggestion.reason,
+                        "schedule_alternatives": suggestion.alternatives,
                     }
                 )
             )

@@ -15,6 +15,7 @@ import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
 	type AttachmentPlanDraft,
+	type AttachmentPlanScheduleAlternative,
 	ChatImportTodosPanel,
 	type UploadFileItem,
 } from "@/apps/chat/components/input/ChatImportTodosPanel";
@@ -22,6 +23,7 @@ import {
 	type AttachmentPlanApiResponse,
 	type AttachmentPlanConfirmResponse,
 	type AttachmentPlanCreateMode,
+	buildBlockedSlotsFromTodos,
 	MAX_IMPORT_FILE_BYTES,
 	MAX_IMPORT_FILES,
 	makeClientId,
@@ -32,7 +34,7 @@ import {
 	toPlanDraft,
 } from "@/apps/chat/utils/attachmentPlan";
 import { customFetcher } from "@/lib/api/fetcher";
-import { useCreateTodo } from "@/lib/query";
+import { useCreateTodo, useTodos } from "@/lib/query";
 import { queryKeys } from "@/lib/query/keys";
 import { toastError, toastSuccess } from "@/lib/toast";
 import type { CreateTodoInput, TodoPriority } from "@/lib/types";
@@ -78,6 +80,7 @@ export function NaturalLanguageTodoModal({
 	const tImport = useTranslations("chat.importTodos");
 	const queryClient = useQueryClient();
 	const createTodoMutation = useCreateTodo();
+	const { data: todos = [] } = useTodos();
 	const fileInputRef = useRef<HTMLInputElement | null>(null);
 	const filesRef = useRef<UploadFileItem[]>([]);
 	const planIdRef = useRef<string | null>(null);
@@ -261,6 +264,17 @@ export function NaturalLanguageTodoModal({
 		[],
 	);
 
+	const usePlanAlternative = useCallback(
+		(itemId: string, alternative: AttachmentPlanScheduleAlternative) => {
+			updatePlanItem(itemId, {
+				suggestedStart: alternative.suggestedStart,
+				suggestedEnd: alternative.suggestedEnd,
+				scheduleReason: tImport("alternativeApplied"),
+			});
+		},
+		[tImport, updatePlanItem],
+	);
+
 	const submitAttachmentPlan = useCallback(async () => {
 		const currentFiles = filesRef.current;
 		const prompt = inputText.trim();
@@ -291,9 +305,14 @@ export function NaturalLanguageTodoModal({
 		for (const file of currentFiles) {
 			formData.append("files", file.file);
 		}
+		const planningStart = new Date();
+		const blockedSlots = buildBlockedSlotsFromTodos(todos, planningStart);
 		formData.append("prompt", prompt);
-		formData.append("reference_time", new Date().toISOString());
-		formData.append("planning_start", new Date().toISOString());
+		formData.append("reference_time", planningStart.toISOString());
+		formData.append("planning_start", planningStart.toISOString());
+		if (blockedSlots.length > 0) {
+			formData.append("blocked_slots_json", JSON.stringify(blockedSlots));
+		}
 
 		try {
 			const response = await fetch("/api/agent/attachment-plan", {
@@ -322,6 +341,7 @@ export function NaturalLanguageTodoModal({
 						message:
 							result?.message ||
 							(result?.error_code ? result.error_code : tImport("planned")),
+						rawTextPreview: result?.raw_text_preview ?? null,
 					};
 				}),
 			);
@@ -344,7 +364,7 @@ export function NaturalLanguageTodoModal({
 			setIsPlanning(false);
 		}
 		return true;
-	}, [buildDefaultParentTitle, clearRemotePlan, inputText, tImport]);
+	}, [buildDefaultParentTitle, clearRemotePlan, inputText, tImport, todos]);
 
 	const submitTextPlan = useCallback(async () => {
 		const prompt = inputText.trim();
@@ -363,13 +383,16 @@ export function NaturalLanguageTodoModal({
 		setPlanId(null);
 
 		try {
+			const planningStart = new Date();
+			const blockedSlots = buildBlockedSlotsFromTodos(todos, planningStart);
 			const response = await fetch("/api/agent/text-plan", {
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
 				body: JSON.stringify({
 					prompt,
-					reference_time: new Date().toISOString(),
-					planning_start: new Date().toISOString(),
+					reference_time: planningStart.toISOString(),
+					planning_start: planningStart.toISOString(),
+					blocked_slots: blockedSlots,
 				}),
 			});
 			if (!response.ok) {
@@ -385,19 +408,19 @@ export function NaturalLanguageTodoModal({
 			);
 			setScheduleSummary(data.schedule_summary || null);
 			if (plannedItems.length === 0) {
-				toastError(tImport("noPlanTodos"));
+				setUploadError(tImport("noPlanTodos"));
 			} else {
 				setSuccessMessage(tImport("planSuccess", { count: plannedItems.length }));
 			}
 			return true;
 		} catch (planErr) {
 			const message = planErr instanceof Error ? planErr.message : String(planErr);
-			toastError(tImport("planFailed", { error: message }));
+			setUploadError(tImport("planFailed", { error: message }));
 			return true;
 		} finally {
 			setIsPlanning(false);
 		}
-	}, [buildDefaultParentTitle, clearRemotePlan, inputText, t, tImport]);
+	}, [buildDefaultParentTitle, clearRemotePlan, inputText, t, tImport, todos]);
 
 	const confirmAttachmentCreate = useCallback(async () => {
 		const validItems = planItems.filter((item) => item.title.trim());
@@ -658,6 +681,8 @@ export function NaturalLanguageTodoModal({
 								)
 							}
 							onUpdatePlanItem={updatePlanItem}
+							onUseAlternative={usePlanAlternative}
+							onRetryPlan={handleParse}
 							onConfirmCreate={confirmAttachmentCreate}
 							onClearAll={clearAttachmentState}
 							createMode={createMode}

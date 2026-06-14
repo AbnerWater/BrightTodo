@@ -1,6 +1,9 @@
 """BrightToDo Agent 自研接口路由"""
 
+import json
+from dataclasses import dataclass
 from datetime import datetime
+from typing import Any
 
 from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
 from fastapi.exceptions import RequestValidationError
@@ -16,12 +19,15 @@ from lifetrace.schemas.agent import (
     AttachmentPlanConfirmResponse,
     AttachmentPlanResponse,
     ImportTodosResponse,
+    ScheduleBlockedSlot,
+    ScheduleConstraint,
     ScheduleSuggestRequest,
     ScheduleSuggestResponse,
 )
 from lifetrace.services.agent_attachment_plan_service import (
     AgentAttachmentPlanService,
     AttachmentPlanError,
+    AttachmentPlanScheduleOptions,
 )
 from lifetrace.services.agent_import_service import (
     MAX_IMPORT_FILE_BYTES,
@@ -38,6 +44,16 @@ from lifetrace.services.schedule_suggest_service import (
 from lifetrace.services.todo_service import TodoService
 
 MAX_TASK_TEXT_LENGTH = 500
+
+
+@dataclass(frozen=True)
+class _AttachmentPlanForm:
+    """附件规划 multipart 表单上下文。"""
+
+    prompt: str
+    reference_time: datetime | None
+    conversation_id: str | None
+    schedule_options: AttachmentPlanScheduleOptions
 
 
 def _error_response(
@@ -65,6 +81,8 @@ class AgentValidationRoute(APIRoute):
                     "请求字段格式错误",
                     str(exc),
                 )
+            except AttachmentPlanError as exc:
+                return _error_response(exc.status_code, exc.error_code, exc.message, exc.detail)
 
         return custom_route_handler
 
@@ -96,6 +114,76 @@ async def _read_import_files(files: list[UploadFile]) -> list[AgentImportFile]:
     return import_files
 
 
+def _parse_form_json_list(
+    raw_value: str | None,
+    item_model: type[Any],
+    field_name: str,
+) -> list[Any]:
+    """解析 multipart 表单中的 JSON 数组字段。"""
+    if not raw_value:
+        return []
+    try:
+        payload = json.loads(raw_value)
+    except json.JSONDecodeError as exc:
+        raise AttachmentPlanError(
+            400,
+            "INVALID_INPUT",
+            f"{field_name} 必须是 JSON 数组",
+            str(exc),
+        ) from exc
+    if not isinstance(payload, list):
+        raise AttachmentPlanError(400, "INVALID_INPUT", f"{field_name} 必须是 JSON 数组")
+    try:
+        return [item_model.model_validate(item) for item in payload]
+    except Exception as exc:
+        raise AttachmentPlanError(
+            400,
+            "INVALID_INPUT",
+            f"{field_name} 字段格式错误",
+            str(exc),
+        ) from exc
+
+
+def _attachment_plan_schedule_options(
+    planning_start: datetime | None = Form(None, description="编排开始时间"),
+    planning_end: datetime | None = Form(None, description="编排结束时间"),
+    daily_available_hours: int | None = Form(None, description="每日可用学习时长"),
+    schedule_constraints_json: str | None = Form(None, description="周期约束 JSON 数组"),
+    blocked_slots_json: str | None = Form(None, description="已有占用时段 JSON 数组"),
+) -> AttachmentPlanScheduleOptions:
+    """解析附件规划表单中的时间编排选项。"""
+    return AttachmentPlanScheduleOptions(
+        planning_start=planning_start,
+        planning_end=planning_end,
+        daily_available_hours=daily_available_hours,
+        schedule_constraints=_parse_form_json_list(
+            schedule_constraints_json,
+            ScheduleConstraint,
+            "schedule_constraints_json",
+        ),
+        blocked_slots=_parse_form_json_list(
+            blocked_slots_json,
+            ScheduleBlockedSlot,
+            "blocked_slots_json",
+        ),
+    )
+
+
+def _attachment_plan_form(
+    prompt: str = Form(..., description="用户确认后的规划 prompt"),
+    reference_time: datetime | None = Form(None, description="相对时间解析基准"),
+    conversation_id: str | None = Form(None, description="聊天会话 ID"),
+    schedule_options: AttachmentPlanScheduleOptions = Depends(_attachment_plan_schedule_options),
+) -> _AttachmentPlanForm:
+    """解析附件规划 multipart 表单。"""
+    return _AttachmentPlanForm(
+        prompt=prompt,
+        reference_time=reference_time,
+        conversation_id=conversation_id,
+        schedule_options=schedule_options,
+    )
+
+
 @router.post("/parse-task", response_model=AgentParseTaskResponse)
 async def parse_task(request: AgentParseTaskRequest):
     """解析中文自然语言任务描述"""
@@ -120,6 +208,8 @@ async def text_plan(request: AgentTextPlanRequest):
             planning_start=request.planning_start,
             planning_end=request.planning_end,
             daily_available_hours=request.daily_available_hours,
+            schedule_constraints=request.schedule_constraints,
+            blocked_slots=request.blocked_slots,
         )
     except AttachmentPlanError as exc:
         return _error_response(exc.status_code, exc.error_code, exc.message, exc.detail)
@@ -160,25 +250,18 @@ async def import_todos(
 @router.post("/attachment-plan", response_model=AttachmentPlanResponse)
 async def create_attachment_plan(
     files: list[UploadFile] = File(..., description="作为下一次对话附件提交的文件列表"),
-    prompt: str = Form(..., description="用户确认后的规划 prompt"),
-    reference_time: datetime | None = Form(None, description="相对时间解析基准"),
-    conversation_id: str | None = Form(None, description="聊天会话 ID"),
-    planning_start: datetime | None = Form(None, description="编排开始时间"),
-    planning_end: datetime | None = Form(None, description="编排结束时间"),
-    daily_available_hours: int | None = Form(None, description="每日可用学习时长"),
+    form: _AttachmentPlanForm = Depends(_attachment_plan_form),
 ):
     """基于附件和用户确认 prompt 生成待确认日程规划。"""
-    _ = conversation_id
+    _ = form.conversation_id
     service = AgentAttachmentPlanService()
     try:
         import_files = await _read_import_files(files)
         return service.create_plan(
             files=import_files,
-            prompt=prompt,
-            reference_time=reference_time,
-            planning_start=planning_start,
-            planning_end=planning_end,
-            daily_available_hours=daily_available_hours,
+            prompt=form.prompt,
+            reference_time=form.reference_time,
+            schedule_options=form.schedule_options,
         )
     except (AttachmentPlanError, ImportTodosError) as exc:
         return _error_response(exc.status_code, exc.error_code, exc.message, exc.detail)
