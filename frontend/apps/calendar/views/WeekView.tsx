@@ -3,8 +3,18 @@
  */
 
 import { useTranslations } from "next-intl";
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useTodoMutations } from "@/lib/query";
+import type {
+	CreateScheduleSuggestion,
+	ScheduleHintOption,
+} from "@/lib/scheduleHints";
+import {
+	buildBlockedSlotsFromTodos,
+	findScheduleConflicts,
+	isoDurationFromRange,
+	requestCreateScheduleSuggestion,
+} from "@/lib/scheduleHints";
 import type { Todo } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { FloatingTodoCard } from "../components/FloatingTodoCard";
@@ -26,6 +36,7 @@ import {
 	isSameDay,
 	MINUTES_PER_SLOT,
 	parseTodoDateTime,
+	setMinutesOnDate,
 	toDateKey,
 } from "../utils";
 import { useWeekViewActions } from "./useWeekViewActions";
@@ -70,6 +81,12 @@ export function WeekView({
 	const { updateTodo, createTodo } = useTodoMutations();
 	const [workingStart, setWorkingStart] = useState(DEFAULT_WORK_START_MINUTES);
 	const [workingEnd, setWorkingEnd] = useState(DEFAULT_WORK_END_MINUTES);
+	const [timelineSuggestion, setTimelineSuggestion] =
+		useState<CreateScheduleSuggestion | null>(null);
+	const [timelineSuggestionError, setTimelineSuggestionError] = useState<
+		string | null
+	>(null);
+	const [isSuggestingTimeline, setIsSuggestingTimeline] = useState(false);
 	const pxPerMinute = SLOT_HEIGHT / MINUTES_PER_SLOT;
 	const weekDays = buildWeekDays(currentDate);
 	const maxTimelineMinutes = 24 * 60 - MINUTES_PER_SLOT;
@@ -199,6 +216,7 @@ export function WeekView({
 		openTimelineCreateAt,
 		openAllDayCreateAt,
 		closeTimelineCreate,
+		applyTimelineSchedule,
 		handleCreateTimelineTodo,
 		handleResize,
 		handleWorkingPointerDown,
@@ -214,6 +232,141 @@ export function WeekView({
 		setWorkingEnd,
 		maxTimelineMinutes,
 	});
+
+	const parseCreateTimeInput = useCallback((value: string) => {
+		const [hh, mm] = value.split(":").map((part) => Number(part));
+		if (Number.isNaN(hh) || Number.isNaN(mm)) return null;
+		return Math.min(Math.max(hh * 60 + mm, 0), maxTimelineMinutes);
+	}, [maxTimelineMinutes]);
+
+	const timelineStartIso = useMemo(() => {
+		if (createMode !== "timeline" || !timelineDate) return null;
+		const startMinutes = parseCreateTimeInput(timelineStart);
+		if (startMinutes === null) return null;
+		return setMinutesOnDate(timelineDate, startMinutes).toISOString();
+	}, [createMode, parseCreateTimeInput, timelineDate, timelineStart]);
+
+	const timelineEndIso = useMemo(() => {
+		if (createMode !== "timeline" || !timelineDate) return null;
+		const startMinutes = parseCreateTimeInput(timelineStart);
+		let endMinutes = parseCreateTimeInput(timelineEnd);
+		if (startMinutes === null) return null;
+		if (endMinutes === null || endMinutes <= startMinutes) {
+			endMinutes = Math.min(
+				Math.max(startMinutes + DEFAULT_DURATION_MINUTES, 0),
+				maxTimelineMinutes,
+			);
+		}
+		return setMinutesOnDate(timelineDate, endMinutes).toISOString();
+	}, [
+		createMode,
+		parseCreateTimeInput,
+		timelineDate,
+		timelineEnd,
+		timelineStart,
+		maxTimelineMinutes,
+	]);
+
+	const timelineWindowStart = useMemo(() => {
+		if (timelineStartIso) return new Date(timelineStartIso);
+		return timelineDate ?? currentDate;
+	}, [currentDate, timelineDate, timelineStartIso]);
+	const timelineBlockedSlots = useMemo(
+		() => buildBlockedSlotsFromTodos(todos, timelineWindowStart),
+		[todos, timelineWindowStart],
+	);
+	const timelineConflicts = useMemo(
+		() =>
+			createMode === "timeline"
+				? findScheduleConflicts(
+						timelineStartIso,
+						timelineEndIso,
+						timelineBlockedSlots,
+					)
+				: [],
+		[createMode, timelineBlockedSlots, timelineEndIso, timelineStartIso],
+	);
+
+	const clearTimelineSuggestion = () => {
+		setTimelineSuggestion(null);
+		setTimelineSuggestionError(null);
+	};
+
+	const handleTimelineTitleChange = (value: string) => {
+		setTimelineTitle(value);
+		setTimelineSuggestionError(null);
+	};
+
+	const handleTimelineStartChange = (value: string) => {
+		setTimelineStart(value);
+		clearTimelineSuggestion();
+	};
+
+	const handleTimelineEndChange = (value: string) => {
+		setTimelineEnd(value);
+		clearTimelineSuggestion();
+	};
+
+	const handleOpenTimelineCreateAt = (
+		params: Parameters<typeof openTimelineCreateAt>[0],
+	) => {
+		clearTimelineSuggestion();
+		openTimelineCreateAt(params);
+	};
+
+	const handleOpenAllDayCreateAt = (
+		date: Date,
+		target: HTMLElement,
+		eventTarget?: HTMLElement,
+	) => {
+		clearTimelineSuggestion();
+		openAllDayCreateAt(date, target, eventTarget);
+	};
+
+	const handleCloseTimelineCreate = () => {
+		closeTimelineCreate();
+		clearTimelineSuggestion();
+	};
+
+	const handleConfirmTimelineCreate = async () => {
+		await handleCreateTimelineTodo();
+		clearTimelineSuggestion();
+	};
+
+	const applyTimelineSuggestion = (option: ScheduleHintOption) => {
+		const startDate = new Date(option.suggestedStart);
+		const endDate = new Date(option.suggestedEnd);
+		if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) {
+			return;
+		}
+		applyTimelineSchedule(startDate, endDate);
+		clearTimelineSuggestion();
+	};
+
+	const handleSuggestTimelineSchedule = async () => {
+		if (createMode !== "timeline" || isSuggestingTimeline) return;
+		setIsSuggestingTimeline(true);
+		setTimelineSuggestionError(null);
+		try {
+			const suggestion = await requestCreateScheduleSuggestion({
+				title: timelineTitle.trim() || t("inputTodoTitle"),
+				duration: isoDurationFromRange(timelineStartIso, timelineEndIso),
+				planningStart: timelineStartIso ?? timelineDate ?? currentDate,
+				blockedSlots: timelineBlockedSlots,
+			});
+			setTimelineSuggestion(suggestion);
+			if (!suggestion) {
+				setTimelineSuggestionError(t("noAvailableSchedule"));
+			}
+		} catch (err) {
+			setTimelineSuggestion(null);
+			setTimelineSuggestionError(
+				err instanceof Error ? err.message : String(err),
+			);
+		} finally {
+			setIsSuggestingTimeline(false);
+		}
+	};
 
 	return (
 		<div className="flex flex-col gap-3">
@@ -268,7 +421,7 @@ export function WeekView({
 								key={dateKey}
 								className="border-l border-border/70 bg-card/50 px-3 py-2"
 								onClick={(event) =>
-									openAllDayCreateAt(
+									handleOpenAllDayCreateAt(
 										day.date,
 										event.currentTarget,
 										event.target as HTMLElement,
@@ -277,7 +430,7 @@ export function WeekView({
 								onKeyDown={(event) => {
 									if (event.key === "Enter" || event.key === " ") {
 										event.preventDefault();
-										openAllDayCreateAt(day.date, event.currentTarget);
+										handleOpenAllDayCreateAt(day.date, event.currentTarget);
 									}
 								}}
 								role="button"
@@ -383,7 +536,7 @@ export function WeekView({
 											}
 											onSelect={onSelectTodo}
 											onResize={handleResize}
-											onSlotPointerDown={openTimelineCreateAt}
+											onSlotPointerDown={handleOpenTimelineCreateAt}
 										/>
 									</div>
 								);
@@ -399,11 +552,17 @@ export function WeekView({
 				endTime={timelineEnd}
 				showTimeFields={createMode !== "all-day"}
 				anchorPoint={timelineAnchor}
-				onChange={setTimelineTitle}
-				onStartTimeChange={setTimelineStart}
-				onEndTimeChange={setTimelineEnd}
-				onConfirm={handleCreateTimelineTodo}
-				onCancel={closeTimelineCreate}
+				conflicts={timelineConflicts}
+				suggestion={timelineSuggestion}
+				isSuggesting={isSuggestingTimeline}
+				suggestionError={timelineSuggestionError}
+				onChange={handleTimelineTitleChange}
+				onStartTimeChange={handleTimelineStartChange}
+				onEndTimeChange={handleTimelineEndChange}
+				onSuggestSchedule={handleSuggestTimelineSchedule}
+				onUseSuggestion={applyTimelineSuggestion}
+				onConfirm={handleConfirmTimelineCreate}
+				onCancel={handleCloseTimelineCreate}
 			/>
 		</div>
 	);

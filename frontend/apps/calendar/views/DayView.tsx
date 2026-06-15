@@ -4,8 +4,18 @@
 
 import { useTranslations } from "next-intl";
 import type React from "react";
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useTodoMutations } from "@/lib/query";
+import type {
+	CreateScheduleSuggestion,
+	ScheduleHintOption,
+} from "@/lib/scheduleHints";
+import {
+	buildBlockedSlotsFromTodos,
+	findScheduleConflicts,
+	isoDurationFromRange,
+	requestCreateScheduleSuggestion,
+} from "@/lib/scheduleHints";
 import { useTodoStore } from "@/lib/store/todo-store";
 import type { Todo } from "@/lib/types";
 import { FloatingTodoCard } from "../components/FloatingTodoCard";
@@ -72,6 +82,12 @@ export function DayView({
 		endMinutes: number;
 	} | null>(null);
 	const [allDayPreview, setAllDayPreview] = useState<Date | null>(null);
+	const [timelineSuggestion, setTimelineSuggestion] =
+		useState<CreateScheduleSuggestion | null>(null);
+	const [timelineSuggestionError, setTimelineSuggestionError] = useState<
+		string | null
+	>(null);
+	const [isSuggestingTimeline, setIsSuggestingTimeline] = useState(false);
 	const weekDayLabels = [
 		t("weekdays.monday"),
 		t("weekdays.tuesday"),
@@ -177,10 +193,126 @@ export function DayView({
 		return Array.from({ length: total }, (_, idx) => displayStart + idx * MINUTES_PER_SLOT);
 	}, [displayEnd, displayStart]);
 
-	const parseTimeInput = (value: string) => {
+	const parseTimeInput = useCallback((value: string) => {
 		const [hh, mm] = value.split(":").map((part) => Number(part));
 		if (Number.isNaN(hh) || Number.isNaN(mm)) return null;
 		return clampMinutes(hh * 60 + mm, 0, maxTimelineMinutes);
+	}, [maxTimelineMinutes]);
+
+	const timelineStartIso = useMemo(() => {
+		if (createMode !== "timeline" || !timelineDate) return null;
+		const startMinutes = parseTimeInput(timelineStart);
+		if (startMinutes === null) return null;
+		return setMinutesOnDate(timelineDate, startMinutes).toISOString();
+	}, [createMode, parseTimeInput, timelineDate, timelineStart]);
+
+	const timelineEndIso = useMemo(() => {
+		if (createMode !== "timeline" || !timelineDate) return null;
+		const startMinutes = parseTimeInput(timelineStart);
+		let endMinutes = parseTimeInput(timelineEnd);
+		if (startMinutes === null) return null;
+		if (endMinutes === null || endMinutes <= startMinutes) {
+			endMinutes = clampMinutes(
+				startMinutes + DEFAULT_DURATION_MINUTES,
+				0,
+				maxTimelineMinutes,
+			);
+		}
+		return setMinutesOnDate(timelineDate, endMinutes).toISOString();
+	}, [
+		createMode,
+		parseTimeInput,
+		timelineDate,
+		timelineEnd,
+		timelineStart,
+		maxTimelineMinutes,
+	]);
+
+	const timelineWindowStart = useMemo(() => {
+		if (timelineStartIso) return new Date(timelineStartIso);
+		return timelineDate ?? currentDate;
+	}, [currentDate, timelineDate, timelineStartIso]);
+	const timelineBlockedSlots = useMemo(
+		() => buildBlockedSlotsFromTodos(todos, timelineWindowStart),
+		[todos, timelineWindowStart],
+	);
+	const timelineConflicts = useMemo(
+		() =>
+			createMode === "timeline"
+				? findScheduleConflicts(
+						timelineStartIso,
+						timelineEndIso,
+						timelineBlockedSlots,
+					)
+				: [],
+		[createMode, timelineBlockedSlots, timelineEndIso, timelineStartIso],
+	);
+
+	const clearTimelineSuggestion = () => {
+		setTimelineSuggestion(null);
+		setTimelineSuggestionError(null);
+	};
+
+	const handleTimelineTitleChange = (value: string) => {
+		setTimelineTitle(value);
+		setTimelineSuggestionError(null);
+	};
+
+	const handleTimelineStartChange = (value: string) => {
+		setTimelineStart(value);
+		clearTimelineSuggestion();
+	};
+
+	const handleTimelineEndChange = (value: string) => {
+		setTimelineEnd(value);
+		clearTimelineSuggestion();
+	};
+
+	const applyTimelineSuggestion = (option: ScheduleHintOption) => {
+		const startDate = new Date(option.suggestedStart);
+		const endDate = new Date(option.suggestedEnd);
+		if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) {
+			return;
+		}
+		const startMinutes = getMinutesFromDate(startDate);
+		const endMinutes = Math.max(
+			startMinutes + MINUTES_PER_SLOT,
+			getMinutesFromDate(endDate),
+		);
+		setTimelineDate(startDate);
+		setTimelineStart(formatMinutesLabel(startMinutes));
+		setTimelineEnd(formatMinutesLabel(endMinutes));
+		setTimelinePreview({
+			date: startDate,
+			startMinutes,
+			endMinutes,
+		});
+		clearTimelineSuggestion();
+	};
+
+	const handleSuggestTimelineSchedule = async () => {
+		if (createMode !== "timeline" || isSuggestingTimeline) return;
+		setIsSuggestingTimeline(true);
+		setTimelineSuggestionError(null);
+		try {
+			const suggestion = await requestCreateScheduleSuggestion({
+				title: timelineTitle.trim() || t("inputTodoTitle"),
+				duration: isoDurationFromRange(timelineStartIso, timelineEndIso),
+				planningStart: timelineStartIso ?? timelineDate ?? currentDate,
+				blockedSlots: timelineBlockedSlots,
+			});
+			setTimelineSuggestion(suggestion);
+			if (!suggestion) {
+				setTimelineSuggestionError(t("noAvailableSchedule"));
+			}
+		} catch (err) {
+			setTimelineSuggestion(null);
+			setTimelineSuggestionError(
+				err instanceof Error ? err.message : String(err),
+			);
+		} finally {
+			setIsSuggestingTimeline(false);
+		}
 	};
 
 	const openTimelineCreateAt = ({
@@ -206,7 +338,7 @@ export function DayView({
 		const preferredLeft = anchorRect.left + 16;
 		const preferredTop = clientY + 8;
 		const popoverWidth = 340;
-		const popoverHeight = 260;
+		const popoverHeight = 420;
 		const left = Math.min(
 			Math.max(12, preferredLeft),
 			viewportWidth - popoverWidth,
@@ -228,6 +360,7 @@ export function DayView({
 			endMinutes,
 		});
 		setAllDayPreview(null);
+		clearTimelineSuggestion();
 	};
 
 	const openAllDayCreateAt = (
@@ -262,6 +395,7 @@ export function DayView({
 		setTimelineAnchor({ top, left });
 		setTimelinePreview(null);
 		setAllDayPreview(currentDate);
+		clearTimelineSuggestion();
 	};
 
 	const closeTimelineCreate = () => {
@@ -273,6 +407,7 @@ export function DayView({
 		setCreateMode(null);
 		setTimelinePreview(null);
 		setAllDayPreview(null);
+		clearTimelineSuggestion();
 	};
 
 	const handleCreateTimelineTodo = async () => {
@@ -500,9 +635,15 @@ export function DayView({
 				endTime={timelineEnd}
 				showTimeFields={createMode !== "all-day"}
 				anchorPoint={timelineAnchor}
-				onChange={setTimelineTitle}
-				onStartTimeChange={setTimelineStart}
-				onEndTimeChange={setTimelineEnd}
+				conflicts={timelineConflicts}
+				suggestion={timelineSuggestion}
+				isSuggesting={isSuggestingTimeline}
+				suggestionError={timelineSuggestionError}
+				onChange={handleTimelineTitleChange}
+				onStartTimeChange={handleTimelineStartChange}
+				onEndTimeChange={handleTimelineEndChange}
+				onSuggestSchedule={handleSuggestTimelineSchedule}
+				onUseSuggestion={applyTimelineSuggestion}
 				onConfirm={handleCreateTimelineTodo}
 				onCancel={closeTimelineCreate}
 			/>

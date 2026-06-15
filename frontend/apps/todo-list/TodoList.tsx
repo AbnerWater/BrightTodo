@@ -10,11 +10,23 @@ import { arrayMove } from "@dnd-kit/sortable";
 import { ChevronRight } from "lucide-react";
 import { useTranslations } from "next-intl";
 import type React from "react";
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { MultiTodoContextMenu } from "@/components/common/context-menu/MultiTodoContextMenu";
 import type { DragData } from "@/lib/dnd";
 import { useTodoMutations, useTodos } from "@/lib/query";
 import type { ReorderTodoItem } from "@/lib/query/todos";
+import type {
+	CreateScheduleSuggestion,
+	ScheduleHintOption,
+} from "@/lib/scheduleHints";
+import {
+	buildBlockedSlotsFromTodos,
+	findScheduleConflicts,
+	fromDateTimeLocalInputValue,
+	isoDurationFromRange,
+	requestCreateScheduleSuggestion,
+	toDateTimeLocalInputValue,
+} from "@/lib/scheduleHints";
 import { useTodoStore } from "@/lib/store/todo-store";
 import type { CreateTodoInput, Todo } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -47,6 +59,14 @@ export function TodoList() {
 	const [searchQuery, setSearchQuery] = useState("");
 	const [newTodoName, setNewTodoName] = useState("");
 	const [newTodoRrule, setNewTodoRrule] = useState<string | null>(null);
+	const [newTodoStartTime, setNewTodoStartTime] = useState("");
+	const [newTodoEndTime, setNewTodoEndTime] = useState("");
+	const [newTodoSuggestion, setNewTodoSuggestion] =
+		useState<CreateScheduleSuggestion | null>(null);
+	const [newTodoSuggestionError, setNewTodoSuggestionError] = useState<
+		string | null
+	>(null);
+	const [isSuggestingNewTodo, setIsSuggestingNewTodo] = useState(false);
 	const [isNaturalLanguageModalOpen, setIsNaturalLanguageModalOpen] =
 		useState(false);
 	const [isCompletedCollapsed, setIsCompletedCollapsed] = useState(true);
@@ -67,6 +87,100 @@ export function TodoList() {
 		collapsedTodoIds,
 		filter,
 	);
+
+	const newTodoStartIso = fromDateTimeLocalInputValue(newTodoStartTime);
+	const newTodoEndIso = fromDateTimeLocalInputValue(newTodoEndTime);
+	const newTodoWindowStart = useMemo(() => {
+		if (!newTodoStartIso) return new Date();
+		const date = new Date(newTodoStartIso);
+		return Number.isNaN(date.getTime()) ? new Date() : date;
+	}, [newTodoStartIso]);
+	const newTodoBlockedSlots = useMemo(
+		() => buildBlockedSlotsFromTodos(todos, newTodoWindowStart),
+		[todos, newTodoWindowStart],
+	);
+	const newTodoConflicts = useMemo(
+		() =>
+			findScheduleConflicts(
+				newTodoStartIso,
+				newTodoEndIso,
+				newTodoBlockedSlots,
+			),
+		[newTodoBlockedSlots, newTodoEndIso, newTodoStartIso],
+	);
+
+	const clearNewTodoScheduleState = useCallback(() => {
+		setNewTodoStartTime("");
+		setNewTodoEndTime("");
+		setNewTodoSuggestion(null);
+		setNewTodoSuggestionError(null);
+		setIsSuggestingNewTodo(false);
+	}, []);
+
+	const resetNewTodoForm = useCallback(() => {
+		setNewTodoName("");
+		setNewTodoRrule(null);
+		clearNewTodoScheduleState();
+	}, [clearNewTodoScheduleState]);
+
+	const handleNewTodoNameChange = useCallback((value: string) => {
+		setNewTodoName(value);
+		setNewTodoSuggestionError(null);
+	}, []);
+
+	const handleNewTodoStartChange = useCallback((value: string) => {
+		setNewTodoStartTime(value);
+		setNewTodoSuggestion(null);
+		setNewTodoSuggestionError(null);
+	}, []);
+
+	const handleNewTodoEndChange = useCallback((value: string) => {
+		setNewTodoEndTime(value);
+		setNewTodoSuggestion(null);
+		setNewTodoSuggestionError(null);
+	}, []);
+
+	const handleUseNewTodoSuggestion = useCallback(
+		(option: ScheduleHintOption) => {
+			setNewTodoStartTime(toDateTimeLocalInputValue(option.suggestedStart));
+			setNewTodoEndTime(toDateTimeLocalInputValue(option.suggestedEnd));
+			setNewTodoSuggestion(null);
+			setNewTodoSuggestionError(null);
+		},
+		[],
+	);
+
+	const handleSuggestNewTodoSchedule = useCallback(async () => {
+		if (isSuggestingNewTodo) return;
+		setIsSuggestingNewTodo(true);
+		setNewTodoSuggestionError(null);
+		try {
+			const suggestion = await requestCreateScheduleSuggestion({
+				title: newTodoName.trim() || tTodoList("addTodo"),
+				duration: isoDurationFromRange(newTodoStartIso, newTodoEndIso),
+				planningStart: newTodoStartIso ?? new Date(),
+				blockedSlots: newTodoBlockedSlots,
+			});
+			setNewTodoSuggestion(suggestion);
+			if (!suggestion) {
+				setNewTodoSuggestionError(tTodoList("noAvailableSchedule"));
+			}
+		} catch (err) {
+			setNewTodoSuggestion(null);
+			setNewTodoSuggestionError(
+				err instanceof Error ? err.message : String(err),
+			);
+		} finally {
+			setIsSuggestingNewTodo(false);
+		}
+	}, [
+		isSuggestingNewTodo,
+		newTodoBlockedSlots,
+		newTodoEndIso,
+		newTodoName,
+		newTodoStartIso,
+		tTodoList,
+	]);
 
 	// 处理内部排序 - 当 TODO_CARD 在列表内移动时
 	const handleInternalReorder = useCallback(
@@ -308,11 +422,18 @@ export function TodoList() {
 			name: newTodoName.trim(),
 			rrule: newTodoRrule,
 		};
+		if (
+			newTodoStartIso &&
+			newTodoEndIso &&
+			new Date(newTodoEndIso) > new Date(newTodoStartIso)
+		) {
+			input.startTime = newTodoStartIso;
+			input.endTime = newTodoEndIso;
+		}
 
 		try {
 			await createTodo(input);
-			setNewTodoName("");
-			setNewTodoRrule(null);
+			resetNewTodoForm();
 		} catch (err) {
 			console.error("Failed to create todo:", err);
 		}
@@ -363,14 +484,21 @@ export function TodoList() {
 					<div className="px-6 py-4 pb-4">
 						<NewTodoInlineForm
 							value={newTodoName}
-							onChange={setNewTodoName}
+							onChange={handleNewTodoNameChange}
 							rrule={newTodoRrule}
 							onRruleChange={setNewTodoRrule}
+							startTime={newTodoStartTime}
+							endTime={newTodoEndTime}
+							onStartTimeChange={handleNewTodoStartChange}
+							onEndTimeChange={handleNewTodoEndChange}
+							conflicts={newTodoConflicts}
+							suggestion={newTodoSuggestion}
+							isSuggesting={isSuggestingNewTodo}
+							suggestionError={newTodoSuggestionError}
+							onSuggestSchedule={handleSuggestNewTodoSchedule}
+							onUseSuggestion={handleUseNewTodoSuggestion}
 							onSubmit={handleCreateTodo}
-							onCancel={() => {
-								setNewTodoName("");
-								setNewTodoRrule(null);
-							}}
+							onCancel={resetNewTodoForm}
 						/>
 					</div>
 

@@ -9,6 +9,7 @@ import {
 	DEFAULT_DURATION_MINUTES,
 	DEFAULT_NEW_TIME,
 	formatMinutesLabel,
+	getMinutesFromDate,
 	isSameDay,
 	MINUTES_PER_SLOT,
 	setMinutesOnDate,
@@ -90,7 +91,7 @@ export function useWeekViewActions({
 		const preferredLeft = anchorRect.left + 16;
 		const preferredTop = clientY + 8;
 		const popoverWidth = 340;
-		const popoverHeight = 260;
+		const popoverHeight = 420;
 		const left = Math.min(
 			Math.max(12, preferredLeft),
 			viewportWidth - popoverWidth,
@@ -157,6 +158,24 @@ export function useWeekViewActions({
 		setTimelineEnd("");
 		setCreateMode(null);
 		setTimelinePreview(null);
+		setAllDayPreview(null);
+	};
+
+	const applyTimelineSchedule = (startDate: Date, endDate: Date) => {
+		const startMinutes = getMinutesFromDate(startDate);
+		const endMinutes = Math.max(
+			startMinutes + MINUTES_PER_SLOT,
+			getMinutesFromDate(endDate),
+		);
+		setCreateMode("timeline");
+		setTimelineDate(startDate);
+		setTimelineStart(formatMinutesLabel(startMinutes));
+		setTimelineEnd(formatMinutesLabel(endMinutes));
+		setTimelinePreview({
+			date: startDate,
+			startMinutes,
+			endMinutes,
+		});
 		setAllDayPreview(null);
 	};
 
@@ -274,6 +293,7 @@ export function useWeekViewActions({
 		openTimelineCreateAt,
 		openAllDayCreateAt,
 		closeTimelineCreate,
+		applyTimelineSchedule,
 		handleCreateTimelineTodo,
 		handleResize,
 		handleWorkingPointerDown,

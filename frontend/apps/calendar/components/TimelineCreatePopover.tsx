@@ -4,10 +4,16 @@
  * Timeline quick create popover.
  */
 
-import { Calendar, Plus, X } from "lucide-react";
+import { AlertTriangle, Calendar, CheckCircle2, Clock, Loader2, Plus, X } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
+import type {
+	CreateScheduleSuggestion,
+	ScheduleHintConflict,
+	ScheduleHintOption,
+} from "@/lib/scheduleHints";
+import { formatScheduleRange } from "@/lib/scheduleHints";
 import { cn } from "@/lib/utils";
 import { formatHumanDate } from "../utils";
 
@@ -18,9 +24,15 @@ export function TimelineCreatePopover({
 	endTime,
 	showTimeFields = true,
 	anchorPoint,
+	conflicts = [],
+	suggestion,
+	isSuggesting = false,
+	suggestionError,
 	onChange,
 	onStartTimeChange,
 	onEndTimeChange,
+	onSuggestSchedule,
+	onUseSuggestion,
 	onConfirm,
 	onCancel,
 }: {
@@ -30,15 +42,26 @@ export function TimelineCreatePopover({
 	endTime: string;
 	showTimeFields?: boolean;
 	anchorPoint: { top: number; left: number } | null;
+	conflicts?: ScheduleHintConflict[];
+	suggestion?: CreateScheduleSuggestion | null;
+	isSuggesting?: boolean;
+	suggestionError?: string | null;
 	onChange: (v: string) => void;
 	onStartTimeChange: (v: string) => void;
 	onEndTimeChange: (v: string) => void;
+	onSuggestSchedule?: () => void;
+	onUseSuggestion?: (option: ScheduleHintOption) => void;
 	onConfirm: () => void;
 	onCancel: () => void;
 }) {
 	const t = useTranslations("calendar");
 	const containerRef = useRef<HTMLDivElement>(null);
 	const inputRef = useRef<HTMLInputElement>(null);
+	const conflictLabel = conflicts
+		.map((conflict) =>
+			conflict.label || formatScheduleRange(conflict.start, conflict.end),
+		)
+		.join("、");
 
 	useEffect(() => {
 		if (targetDate) {
@@ -143,28 +166,122 @@ export function TimelineCreatePopover({
 							className="w-full rounded-lg border border-border/70 bg-background/80 px-3 py-2 text-sm shadow-sm transition focus:border-primary/60 focus:outline-none focus:ring-2 focus:ring-primary/30 placeholder:text-muted-foreground/60"
 						/>
 						{showTimeFields && (
-							<div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-								<label className="flex items-center gap-2">
-									<span className="min-w-[48px]">{t("startTime")}</span>
-									<input
-										type="time"
-										step={900}
-										value={startTime}
-										onChange={(event) => onStartTimeChange(event.target.value)}
-										className="w-24 rounded-lg border border-border/70 bg-background/80 px-2 py-2 text-sm shadow-sm transition focus:border-primary/60 focus:outline-none focus:ring-2 focus:ring-primary/30"
-									/>
-								</label>
-								<label className="flex items-center gap-2">
-									<span className="min-w-[48px]">{t("endTime")}</span>
-									<input
-										type="time"
-										step={900}
-										value={endTime}
-										onChange={(event) => onEndTimeChange(event.target.value)}
-										className="w-24 rounded-lg border border-border/70 bg-background/80 px-2 py-2 text-sm shadow-sm transition focus:border-primary/60 focus:outline-none focus:ring-2 focus:ring-primary/30"
-									/>
-								</label>
-							</div>
+							<>
+								<div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+									<label className="flex items-center gap-2">
+										<span className="min-w-[48px]">{t("startTime")}</span>
+										<input
+											type="time"
+											step={900}
+											value={startTime}
+											onChange={(event) => onStartTimeChange(event.target.value)}
+											className="w-24 rounded-lg border border-border/70 bg-background/80 px-2 py-2 text-sm shadow-sm transition focus:border-primary/60 focus:outline-none focus:ring-2 focus:ring-primary/30"
+										/>
+									</label>
+									<label className="flex items-center gap-2">
+										<span className="min-w-[48px]">{t("endTime")}</span>
+										<input
+											type="time"
+											step={900}
+											value={endTime}
+											onChange={(event) => onEndTimeChange(event.target.value)}
+											className="w-24 rounded-lg border border-border/70 bg-background/80 px-2 py-2 text-sm shadow-sm transition focus:border-primary/60 focus:outline-none focus:ring-2 focus:ring-primary/30"
+										/>
+									</label>
+									{onSuggestSchedule && (
+										<button
+											type="button"
+											onClick={onSuggestSchedule}
+											disabled={isSuggesting}
+											className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-border/70 bg-background/80 px-2 text-xs font-medium text-foreground hover:bg-muted/70 disabled:cursor-not-allowed disabled:opacity-60"
+										>
+											{isSuggesting ? (
+												<Loader2 className="h-3.5 w-3.5 animate-spin" />
+											) : (
+												<Clock className="h-3.5 w-3.5" />
+											)}
+											{isSuggesting
+												? t("recommendingFreeTime")
+												: t("recommendFreeTime")}
+										</button>
+									)}
+								</div>
+								<div className="space-y-2">
+									{startTime && endTime && conflicts.length > 0 && (
+										<div className="rounded-md border border-amber-300/70 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-200">
+											<div className="flex items-center gap-1.5 font-medium">
+												<AlertTriangle className="h-3.5 w-3.5" />
+												{t("scheduleConflictTitle")}
+											</div>
+											<p className="mt-1">
+												{t("scheduleConflictWith", { label: conflictLabel })}
+											</p>
+											<p className="mt-1 text-amber-700 dark:text-amber-200/80">
+												{t("scheduleConflictNonBlocking")}
+											</p>
+										</div>
+									)}
+									{startTime && endTime && conflicts.length === 0 && (
+										<div className="flex items-center gap-1.5 text-xs text-emerald-700 dark:text-emerald-300">
+											<CheckCircle2 className="h-3.5 w-3.5" />
+											{t("scheduleNoConflict")}
+										</div>
+									)}
+									{suggestionError && (
+										<p className="text-xs text-destructive">
+											{t("recommendationFailed", { error: suggestionError })}
+										</p>
+									)}
+									{suggestion && (
+										<div className="rounded-md border border-border/70 bg-background/70 px-3 py-2 text-xs">
+											<div className="flex flex-wrap items-center gap-2">
+												<span className="font-medium text-foreground">
+													{t("recommendedSlot", {
+														time: formatScheduleRange(
+															suggestion.suggestedStart,
+															suggestion.suggestedEnd,
+														),
+													})}
+												</span>
+												{onUseSuggestion && (
+													<button
+														type="button"
+														onClick={() => onUseSuggestion(suggestion)}
+														className="rounded-md border border-border px-2 py-1 text-foreground hover:bg-muted"
+													>
+														{t("useRecommendedSlot", {
+															time: formatScheduleRange(
+																suggestion.suggestedStart,
+																suggestion.suggestedEnd,
+															),
+														})}
+													</button>
+												)}
+											</div>
+											{suggestion.alternatives.length > 0 && onUseSuggestion && (
+												<div className="mt-2 flex flex-wrap items-center gap-1.5">
+													<span className="text-muted-foreground">
+														{t("alternativeSlots")}
+													</span>
+													{suggestion.alternatives.map((alternative) => (
+														<button
+															key={`${alternative.suggestedStart}-${alternative.suggestedEnd}`}
+															type="button"
+															onClick={() => onUseSuggestion(alternative)}
+															className="rounded-md border border-border px-2 py-1 text-foreground hover:bg-muted"
+														>
+															{formatScheduleRange(
+																alternative.suggestedStart,
+																alternative.suggestedEnd,
+															)}
+														</button>
+													))}
+												</div>
+											)}
+										</div>
+									)}
+								</div>
+							</>
 						)}
 						<button
 							type="button"
@@ -181,7 +298,7 @@ export function TimelineCreatePopover({
 							)}
 						>
 							<Plus className="h-4 w-4" />
-							{t("create")}
+							{conflicts.length > 0 ? t("createAnyway") : t("create")}
 						</button>
 					</div>
 				</div>
