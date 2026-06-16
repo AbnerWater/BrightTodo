@@ -36,9 +36,10 @@ Packaging:
 
 ## Testing Guidelines
 
-- No dedicated test runner is configured yet. If you add tests, place Python tests under `tests/`
-  and align with Ruff’s `tests/*.py` per-file ignores. For frontend, prefer a future `pnpm test`
-  script; document any new runner in this file.
+- 后端测试使用 Pytest，Python 测试放在 `tests/` 下，并与 Ruff 的 `tests/*.py`
+  文件级忽略规则保持一致。
+- 前端单元测试使用 Node.js 内置测试运行器，测试文件放在 `frontend/tests/` 下。
+  在 `frontend/` 中运行 `pnpm test`，或使用 `pnpm test:watch` 监听文件变化。
 
 ## Commit & Pull Request Guidelines
 
