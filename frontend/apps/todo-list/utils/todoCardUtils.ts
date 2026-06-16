@@ -26,7 +26,7 @@ export function formatScheduleLabel(
 			? dateLabel
 			: `${dateLabel} ${timeLabel}`;
 
-	if (!endTime) return startLabel;
+	if (!startTime || !endTime) return startLabel;
 	const endDate = new Date(endTime);
 	if (Number.isNaN(endDate.getTime())) return startLabel;
 	const sameDay = startDate.toDateString() === endDate.toDateString();

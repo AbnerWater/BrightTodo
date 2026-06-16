@@ -61,7 +61,7 @@ BrightToDo 是一个面向学生学习场景的智能任务管理系统，也是
 ### 环境要求
 
 - Python 3.12
-- Node.js 与 pnpm
+- Node.js 22.6 或更高版本与 pnpm
 - uv
 
 ### 一键启动
@@ -125,6 +125,7 @@ pnpm lint
 pnpm format
 pnpm check
 pnpm type-check
+pnpm test
 ```
 
 ## 迭代计划
