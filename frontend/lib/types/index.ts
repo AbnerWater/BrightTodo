@@ -207,6 +207,29 @@ export interface TodoListResponse {
 	todos: Todo[];
 }
 
+export interface TodoTimeOptimizationRange {
+	startTime?: string | null;
+	endTime?: string | null;
+}
+
+export interface TodoTimeOptimizationConflict {
+	id: number;
+	name: string;
+	startTime: string;
+	endTime: string;
+}
+
+export interface TodoTimeOptimizationResponse {
+	todoId: number;
+	todoName: string;
+	before: TodoTimeOptimizationRange;
+	after: TodoTimeOptimizationRange;
+	hasConflict: boolean;
+	conflicts: TodoTimeOptimizationConflict[];
+	reason: string;
+	confidence: number;
+}
+
 export interface ActivityListResponse {
 	total: number;
 	activities: Activity[];

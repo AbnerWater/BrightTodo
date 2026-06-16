@@ -1,7 +1,7 @@
 "use client";
 
 import { CSS } from "@dnd-kit/utilities";
-import { Hammer, Paperclip, Sparkles } from "lucide-react";
+import { CalendarClock, Hammer, Paperclip, Sparkles } from "lucide-react";
 import { useTranslations } from "next-intl";
 import type React from "react";
 import { useMemo } from "react";
@@ -29,6 +29,7 @@ export interface TodoCardProps {
 	hasMultipleSelection?: boolean; // 是否有多个 todo 被选中
 	onSelect: (e: React.MouseEvent<HTMLDivElement>) => void;
 	onSelectSingle: () => void;
+	onOptimizeTime?: (todo: Todo) => void;
 }
 
 export function TodoCard({
@@ -40,6 +41,7 @@ export function TodoCard({
 	hasMultipleSelection = false,
 	onSelect,
 	onSelectSingle,
+	onOptimizeTime,
 }: TodoCardProps) {
 	const tTodoDetail = useTranslations("todoDetail");
 	// 从 TanStack Query 获取 todos 数据（用于检查是否有子任务）
@@ -67,6 +69,7 @@ export function TodoCard({
 	}, [todos, todo.id]);
 
 	const isExpanded = isTodoExpanded(todo.id);
+	const canOptimizeTime = depth === 0 && todo.status === "active" && !isOverlay;
 
 	const style = !isOverlay
 		? {
@@ -165,6 +168,21 @@ export function TodoCard({
 							>
 								<Sparkles className="h-4 w-4 text-amber-500" />
 							</button>
+							{canOptimizeTime && onOptimizeTime && (
+								<button
+									type="button"
+									onClick={(e) => {
+										e.stopPropagation();
+										onSelectSingle();
+										onOptimizeTime(todo);
+									}}
+									className="flex h-5 w-5 items-center justify-center rounded-md hover:bg-muted/50 transition-all"
+									aria-label={tTodoDetail("optimizeTime")}
+									title={tTodoDetail("optimizeTimeTitle")}
+								>
+									<CalendarClock className="h-4 w-4 text-sky-500" />
+								</button>
+							)}
 						</div>
 
 						<div className="flex items-center gap-2 shrink-0">

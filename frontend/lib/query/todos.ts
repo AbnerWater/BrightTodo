@@ -1,6 +1,7 @@
 "use client";
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { snakeToCamel } from "@/lib/generated/case-transform";
 import {
 	createTodoApiTodosPost,
 	deleteTodoApiTodosTodoIdDelete,
@@ -14,6 +15,7 @@ import type {
 	TodoListResponse,
 	TodoPriority,
 	TodoStatus,
+	TodoTimeOptimizationResponse,
 	UpdateTodoInput,
 } from "@/lib/types";
 import { queryKeys } from "./keys";
@@ -46,6 +48,19 @@ function normalizeDateTimeValue(
 		return `${value}T00:00:00`;
 	}
 	return value;
+}
+
+async function readApiError(response: Response): Promise<string> {
+	const fallback = `API Error: ${response.status}`;
+	const text = await response.text();
+	if (!text) return fallback;
+	try {
+		const data = JSON.parse(text) as Record<string, unknown>;
+		const message = data.message ?? data.detail ?? data.error_code;
+		return typeof message === "string" && message.trim() ? message : fallback;
+	} catch {
+		return fallback;
+	}
 }
 
 /**
@@ -138,6 +153,19 @@ export function useTodos(params?: UseTodosParams) {
 			},
 		},
 	);
+}
+
+export async function requestTodoTimeOptimization(
+	todoId: number,
+): Promise<TodoTimeOptimizationResponse> {
+	const response = await fetch(`/api/todos/${todoId}/time-optimization`, {
+		method: "POST",
+	});
+	if (!response.ok) {
+		throw new Error(await readApiError(response));
+	}
+	const data = (await response.json()) as unknown;
+	return snakeToCamel<TodoTimeOptimizationResponse>(data);
 }
 
 // ============================================================================
@@ -512,6 +540,12 @@ export function useReorderTodos() {
 		onSettled: () => {
 			queryClient.invalidateQueries({ queryKey: queryKeys.todos.all });
 		},
+	});
+}
+
+export function useTodoTimeOptimization() {
+	return useMutation({
+		mutationFn: requestTodoTimeOptimization,
 	});
 }
 

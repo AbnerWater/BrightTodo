@@ -211,6 +211,38 @@ class TodoListResponse(BaseModel):
     todos: list[TodoResponse] = Field(..., description="待办列表")
 
 
+class TodoTimeOptimizationRange(BaseModel):
+    """待办时间优化前后的时间段"""
+
+    start_time: datetime | None = Field(None, description="开始时间")
+    end_time: datetime | None = Field(None, description="结束时间")
+
+
+class TodoTimeOptimizationConflict(BaseModel):
+    """待办时间冲突项"""
+
+    id: int = Field(..., description="冲突待办 ID")
+    name: str = Field(..., description="冲突待办名称")
+    start_time: datetime = Field(..., description="冲突开始时间")
+    end_time: datetime = Field(..., description="冲突结束时间")
+
+
+class TodoTimeOptimizationResponse(BaseModel):
+    """AI 待办时间优化预览响应"""
+
+    todo_id: int = Field(..., description="目标待办 ID")
+    todo_name: str = Field(..., description="目标待办名称")
+    before: TodoTimeOptimizationRange = Field(..., description="优化前时间")
+    after: TodoTimeOptimizationRange = Field(..., description="AI 推荐时间")
+    has_conflict: bool = Field(..., description="优化前是否存在时间冲突")
+    conflicts: list[TodoTimeOptimizationConflict] = Field(
+        default_factory=list,
+        description="优化前检测到的冲突待办",
+    )
+    reason: str = Field(..., description="AI 推荐理由")
+    confidence: float = Field(..., ge=0, le=1, description="AI 推荐置信度")
+
+
 class TodoReorderItem(BaseModel):
     """单个待办排序项"""
 

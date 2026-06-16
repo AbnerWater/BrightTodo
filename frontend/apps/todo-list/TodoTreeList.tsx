@@ -12,6 +12,7 @@ import {
 } from "@dnd-kit/sortable";
 import type React from "react";
 import { useGlobalDndSafe } from "@/lib/dnd";
+import type { Todo } from "@/lib/types";
 import type { OrderedTodo } from "./hooks/useOrderedTodos";
 import { TodoCard } from "./TodoCard";
 
@@ -20,6 +21,7 @@ interface TodoTreeListProps {
 	selectedTodoIds: number[];
 	onSelect: (todoId: number, event: React.MouseEvent<HTMLDivElement>) => void;
 	onSelectSingle: (todoId: number) => void;
+	onOptimizeTime?: (todo: Todo) => void;
 }
 
 export function TodoTreeList({
@@ -27,6 +29,7 @@ export function TodoTreeList({
 	selectedTodoIds,
 	onSelect,
 	onSelectSingle,
+	onOptimizeTime,
 }: TodoTreeListProps) {
 	// 从全局上下文获取活动拖拽状态
 	const dndContext = useGlobalDndSafe();
@@ -52,6 +55,7 @@ export function TodoTreeList({
 							hasMultipleSelection={selectedTodoIds.length > 1}
 							onSelect={(event) => onSelect(todo.id, event)}
 							onSelectSingle={() => onSelectSingle(todo.id)}
+							onOptimizeTime={onOptimizeTime}
 						/>
 					</div>
 				))}

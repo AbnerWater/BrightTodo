@@ -13,7 +13,7 @@ import type React from "react";
 import { useCallback, useMemo, useState } from "react";
 import { MultiTodoContextMenu } from "@/components/common/context-menu/MultiTodoContextMenu";
 import type { DragData } from "@/lib/dnd";
-import { useTodoMutations, useTodos } from "@/lib/query";
+import { useTodoMutations, useTodos, useTodoTimeOptimization } from "@/lib/query";
 import type { ReorderTodoItem } from "@/lib/query/todos";
 import type {
 	CreateScheduleSuggestion,
@@ -28,12 +28,18 @@ import {
 	toDateTimeLocalInputValue,
 } from "@/lib/scheduleHints";
 import { useTodoStore } from "@/lib/store/todo-store";
-import type { CreateTodoInput, Todo } from "@/lib/types";
+import { toastError, toastSuccess } from "@/lib/toast";
+import type {
+	CreateTodoInput,
+	Todo,
+	TodoTimeOptimizationResponse,
+} from "@/lib/types";
 import { cn } from "@/lib/utils";
 import type { TodoFilterState } from "./components/TodoFilter";
 import { useOrderedTodos } from "./hooks/useOrderedTodos";
 import { NaturalLanguageTodoModal } from "./NaturalLanguageTodoModal";
 import { NewTodoInlineForm } from "./NewTodoInlineForm";
+import { TodoTimeOptimizationPreviewDialog } from "./TodoTimeOptimizationPreviewDialog";
 import { TodoToolbar } from "./TodoToolbar";
 import { TodoTreeList } from "./TodoTreeList";
 
@@ -43,7 +49,11 @@ export function TodoList() {
 	const { data: todos = [], isLoading, error } = useTodos();
 
 	// 从 TanStack Query 获取 mutation 操作
-	const { createTodo, reorderTodos } = useTodoMutations();
+	const { createTodo, reorderTodos, updateTodo } = useTodoMutations();
+	const {
+		mutateAsync: optimizeTodoTime,
+		isPending: isOptimizingTodoTime,
+	} = useTodoTimeOptimization();
 
 	// 从 Zustand 获取 UI 状态
 	const {
@@ -68,6 +78,16 @@ export function TodoList() {
 	>(null);
 	const [isSuggestingNewTodo, setIsSuggestingNewTodo] = useState(false);
 	const [isNaturalLanguageModalOpen, setIsNaturalLanguageModalOpen] =
+		useState(false);
+	const [isTimeOptimizationDialogOpen, setIsTimeOptimizationDialogOpen] =
+		useState(false);
+	const [timeOptimizationTodo, setTimeOptimizationTodo] =
+		useState<Todo | null>(null);
+	const [timeOptimizationResult, setTimeOptimizationResult] =
+		useState<TodoTimeOptimizationResponse | null>(null);
+	const [timeOptimizationError, setTimeOptimizationError] =
+		useState<string | null>(null);
+	const [isConfirmingTimeOptimization, setIsConfirmingTimeOptimization] =
 		useState(false);
 	const [isCompletedCollapsed, setIsCompletedCollapsed] = useState(true);
 	const [filter, setFilter] = useState<TodoFilterState>({
@@ -149,6 +169,72 @@ export function TodoList() {
 		},
 		[],
 	);
+
+	const resetTimeOptimizationState = useCallback(() => {
+		setTimeOptimizationTodo(null);
+		setTimeOptimizationResult(null);
+		setTimeOptimizationError(null);
+	}, []);
+
+	const handleTimeOptimizationOpenChange = useCallback(
+		(open: boolean) => {
+			setIsTimeOptimizationDialogOpen(open);
+			if (!open) {
+				resetTimeOptimizationState();
+			}
+		},
+		[resetTimeOptimizationState],
+	);
+
+	const handleOptimizeTodoTime = useCallback(
+		async (todo: Todo) => {
+			setSelectedTodoId(todo.id);
+			setAnchorTodoId(todo.id);
+			setTimeOptimizationTodo(todo);
+			setTimeOptimizationResult(null);
+			setTimeOptimizationError(null);
+			setIsTimeOptimizationDialogOpen(true);
+			try {
+				const result = await optimizeTodoTime(todo.id);
+				setTimeOptimizationResult(result);
+			} catch (err) {
+				setTimeOptimizationError(
+					err instanceof Error ? err.message : String(err),
+				);
+			}
+		},
+		[optimizeTodoTime, setAnchorTodoId, setSelectedTodoId],
+	);
+
+	const handleConfirmTimeOptimization = useCallback(async () => {
+		if (
+			!timeOptimizationResult?.after.startTime ||
+			!timeOptimizationResult.after.endTime
+		) {
+			toastError(tTodoList("timeOptimizationMissingTime"));
+			return;
+		}
+
+		setIsConfirmingTimeOptimization(true);
+		try {
+			await updateTodo(timeOptimizationResult.todoId, {
+				startTime: timeOptimizationResult.after.startTime,
+				endTime: timeOptimizationResult.after.endTime,
+			});
+			toastSuccess(tTodoList("timeOptimizationSuccess"));
+			handleTimeOptimizationOpenChange(false);
+		} catch (err) {
+			const message = err instanceof Error ? err.message : String(err);
+			toastError(tTodoList("timeOptimizationUpdateFailed", { error: message }));
+		} finally {
+			setIsConfirmingTimeOptimization(false);
+		}
+	}, [
+		handleTimeOptimizationOpenChange,
+		tTodoList,
+		timeOptimizationResult,
+		updateTodo,
+	]);
 
 	const handleSuggestNewTodoSchedule = useCallback(async () => {
 		if (isSuggestingNewTodo) return;
@@ -509,11 +595,12 @@ export function TodoList() {
 					) : (
 						<>
 							{orderedTodos.length > 0 && (
-								<TodoTreeList
+							<TodoTreeList
 									orderedTodos={orderedTodos}
 									selectedTodoIds={selectedTodoIds}
 									onSelect={handleSelect}
 									onSelectSingle={(id) => setSelectedTodoId(id)}
+									onOptimizeTime={handleOptimizeTodoTime}
 								/>
 							)}
 							{filter.status === "all" && completedRootCount > 0 && (
@@ -543,6 +630,7 @@ export function TodoList() {
 												selectedTodoIds={selectedTodoIds}
 												onSelect={handleSelect}
 												onSelectSingle={(id) => setSelectedTodoId(id)}
+												onOptimizeTime={handleOptimizeTodoTime}
 											/>
 										)}
 								</div>
@@ -551,6 +639,20 @@ export function TodoList() {
 					)}
 				</div>
 			</MultiTodoContextMenu>
+			<TodoTimeOptimizationPreviewDialog
+				open={isTimeOptimizationDialogOpen}
+				onOpenChange={handleTimeOptimizationOpenChange}
+				todo={timeOptimizationTodo}
+				result={timeOptimizationResult}
+				isLoading={
+					isOptimizingTodoTime &&
+					!timeOptimizationResult &&
+					!timeOptimizationError
+				}
+				error={timeOptimizationError}
+				isConfirming={isConfirmingTimeOptimization}
+				onConfirm={handleConfirmTimeOptimization}
+			/>
 		</div>
 	);
 }

@@ -33,6 +33,7 @@ from lifetrace.services.chat_service import ChatService
 from lifetrace.services.event_service import EventService
 from lifetrace.services.journal_service import JournalService
 from lifetrace.services.todo_service import TodoService
+from lifetrace.services.todo_time_optimization_service import TodoTimeOptimizationService
 from lifetrace.storage.database_base import DatabaseBase
 from lifetrace.util.settings import settings
 
@@ -76,6 +77,11 @@ def get_todo_service(
 ) -> TodoService:
     """获取 Todo 服务实例"""
     return TodoService(repo)
+
+
+def get_todo_time_optimization_service() -> TodoTimeOptimizationService:
+    """获取 Todo AI 时间优化服务实例"""
+    return TodoTimeOptimizationService()
 
 
 # ========== Journal 模块依赖注入 ==========

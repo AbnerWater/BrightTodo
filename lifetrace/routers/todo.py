@@ -9,22 +9,25 @@ from typing import TYPE_CHECKING
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, File, HTTPException, Path, Query, Response, UploadFile
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 
-from lifetrace.core.dependencies import get_todo_service
+from lifetrace.core.dependencies import get_todo_service, get_todo_time_optimization_service
 from lifetrace.schemas.todo import (
     TodoAttachmentResponse,
     TodoCreate,
     TodoListResponse,
     TodoReorderRequest,
     TodoResponse,
+    TodoTimeOptimizationResponse,
     TodoUpdate,
 )
 from lifetrace.services.icalendar_service import ICalendarService
+from lifetrace.services.todo_time_optimization_service import TodoTimeOptimizationError
 from lifetrace.util.path_utils import get_attachments_dir
 
 if TYPE_CHECKING:
     from lifetrace.services.todo_service import TodoService
+    from lifetrace.services.todo_time_optimization_service import TodoTimeOptimizationService
 
 router = APIRouter(prefix="/api/todos", tags=["todos"])
 MAX_ATTACHMENT_SIZE = 50 * 1024 * 1024  # 50MB
@@ -32,6 +35,18 @@ MAX_ATTACHMENT_SIZE = 50 * 1024 * 1024  # 50MB
 
 def _sanitize_filename(name: str) -> str:
     return FsPath(name).name if name else "attachment"
+
+
+def _error_response(
+    status_code: int,
+    error_code: str,
+    message: str,
+    detail: str | None = None,
+) -> JSONResponse:
+    payload = {"error_code": error_code, "message": message}
+    if detail:
+        payload["detail"] = detail
+    return JSONResponse(status_code=status_code, content=payload)
 
 
 @router.get("", response_model=TodoListResponse)
@@ -43,6 +58,21 @@ async def list_todos(
 ):
     """获取待办列表"""
     return service.list_todos(limit, offset, status)
+
+
+@router.post("/{todo_id}/time-optimization", response_model=TodoTimeOptimizationResponse)
+async def optimize_todo_time(
+    todo_id: int = Path(..., description="Todo ID"),
+    service: TodoService = Depends(get_todo_service),
+    optimization_service: TodoTimeOptimizationService = Depends(
+        get_todo_time_optimization_service
+    ),
+):
+    """生成待办 AI 时间优化预览"""
+    try:
+        return optimization_service.optimize(todo_id, service)
+    except TodoTimeOptimizationError as exc:
+        return _error_response(exc.status_code, exc.error_code, exc.message, exc.detail)
 
 
 @router.get("/{todo_id}", response_model=TodoResponse)
