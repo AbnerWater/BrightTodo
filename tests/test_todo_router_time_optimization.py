@@ -8,7 +8,11 @@ from fastapi.testclient import TestClient
 
 from lifetrace.core.dependencies import get_todo_service, get_todo_time_optimization_service
 from lifetrace.routers.todo import router
-from lifetrace.schemas.todo import TodoTimeOptimizationRange, TodoTimeOptimizationResponse
+from lifetrace.schemas.todo import (
+    TodoTimeOptimizationItem,
+    TodoTimeOptimizationRange,
+    TodoTimeOptimizationResponse,
+)
 from lifetrace.services.todo_time_optimization_service import TodoTimeOptimizationError
 
 HTTP_OK = 200
@@ -43,6 +47,27 @@ class FakeOptimizationService:
             conflicts=[],
             reason="避开冲突并保留专注时间。",
             confidence=EXPECTED_CONFIDENCE,
+            items=[
+                TodoTimeOptimizationItem(
+                    todo_id=1,
+                    todo_name="写周报",
+                    parent_todo_id=None,
+                    status="active",
+                    depth=0,
+                    before=TodoTimeOptimizationRange(
+                        start_time=_dt("2030-01-01T10:00:00+00:00"),
+                        end_time=_dt("2030-01-01T11:00:00+00:00"),
+                    ),
+                    after=TodoTimeOptimizationRange(
+                        start_time=_dt("2030-01-01T12:00:00+00:00"),
+                        end_time=_dt("2030-01-01T13:00:00+00:00"),
+                    ),
+                    has_conflict=True,
+                    conflicts=[],
+                    reason="避开冲突并保留专注时间。",
+                    confidence=EXPECTED_CONFIDENCE,
+                ),
+            ],
         )
 
 
@@ -78,6 +103,9 @@ def test_todo_time_optimization_endpoint_returns_preview_contract() -> None:
     assert data["has_conflict"] is True
     assert data["reason"]
     assert data["confidence"] == EXPECTED_CONFIDENCE
+    assert data["items"][0]["todo_id"] == 1
+    assert data["items"][0]["depth"] == 0
+    assert data["items"][0]["after"]["start_time"] == "2030-01-01T12:00:00Z"
 
 
 def test_todo_time_optimization_endpoint_returns_domain_error_contract() -> None:

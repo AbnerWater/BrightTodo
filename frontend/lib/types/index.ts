@@ -219,6 +219,20 @@ export interface TodoTimeOptimizationConflict {
 	endTime: string;
 }
 
+export interface TodoTimeOptimizationItem {
+	todoId: number;
+	todoName: string;
+	parentTodoId?: number | null;
+	status: TodoStatus;
+	depth: number;
+	before: TodoTimeOptimizationRange;
+	after: TodoTimeOptimizationRange;
+	hasConflict: boolean;
+	conflicts: TodoTimeOptimizationConflict[];
+	reason: string;
+	confidence: number;
+}
+
 export interface TodoTimeOptimizationResponse {
 	todoId: number;
 	todoName: string;
@@ -228,6 +242,7 @@ export interface TodoTimeOptimizationResponse {
 	conflicts: TodoTimeOptimizationConflict[];
 	reason: string;
 	confidence: number;
+	items: TodoTimeOptimizationItem[];
 }
 
 export interface ActivityListResponse {

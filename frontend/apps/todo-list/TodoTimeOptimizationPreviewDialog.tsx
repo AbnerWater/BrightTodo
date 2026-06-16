@@ -11,7 +11,11 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from "@/components/ui/dialog";
-import type { Todo, TodoTimeOptimizationResponse } from "@/lib/types";
+import type {
+	Todo,
+	TodoTimeOptimizationItem,
+	TodoTimeOptimizationResponse,
+} from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { formatScheduleLabel } from "./utils/todoCardUtils";
 
@@ -37,6 +41,28 @@ function formatTimeRange(
 	);
 }
 
+function getOptimizationItems(
+	result: TodoTimeOptimizationResponse | null,
+): TodoTimeOptimizationItem[] {
+	if (!result) return [];
+	if (result.items?.length > 0) return result.items;
+	return [
+		{
+			todoId: result.todoId,
+			todoName: result.todoName,
+			parentTodoId: null,
+			status: "active",
+			depth: 0,
+			before: result.before,
+			after: result.after,
+			hasConflict: result.hasConflict,
+			conflicts: result.conflicts,
+			reason: result.reason,
+			confidence: result.confidence,
+		},
+	];
+}
+
 export function TodoTimeOptimizationPreviewDialog({
 	open,
 	onOpenChange,
@@ -48,16 +74,23 @@ export function TodoTimeOptimizationPreviewDialog({
 	onConfirm,
 }: TodoTimeOptimizationPreviewDialogProps) {
 	const t = useTranslations("todoList");
+	const optimizationItems = getOptimizationItems(result);
 	const canConfirm =
-		!!result?.after.startTime &&
-		!!result.after.endTime &&
+		optimizationItems.length > 0 &&
+		optimizationItems.every((item) => item.after.startTime && item.after.endTime) &&
 		!isLoading &&
 		!error &&
 		!isConfirming;
+	const statusLabels = {
+		active: t("statusActive"),
+		completed: t("statusCompleted"),
+		canceled: t("statusCanceled"),
+		draft: t("statusDraft"),
+	};
 
 	return (
 		<Dialog open={open} onOpenChange={onOpenChange}>
-			<DialogContent className="max-h-[86vh] max-w-xl overflow-hidden p-0">
+			<DialogContent className="max-h-[86vh] max-w-2xl overflow-hidden p-0">
 				<DialogHeader className="border-b border-border px-4 py-3">
 					<div className="flex items-center gap-2">
 						<Sparkles className="h-5 w-5 shrink-0 text-primary" />
@@ -96,7 +129,7 @@ export function TodoTimeOptimizationPreviewDialog({
 										: "border-emerald-300/70 bg-emerald-50 text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-200",
 								)}
 							>
-								<Clock className="h-3.5 w-3.5" />
+									<Clock className="h-3.5 w-3.5" />
 								{result.hasConflict
 									? t("timeOptimizationConflict", {
 											count: result.conflicts.length,
@@ -104,69 +137,119 @@ export function TodoTimeOptimizationPreviewDialog({
 									: t("timeOptimizationNoConflict")}
 							</div>
 
-							<div className="grid gap-3 sm:grid-cols-2">
-								<div className="rounded-md border border-border bg-muted/20 p-3">
-									<div className="text-xs font-medium text-muted-foreground">
-										{t("timeOptimizationBefore")}
-									</div>
-									<div className="mt-2 text-sm font-medium text-foreground">
-										{formatTimeRange(
-											result.before,
-											t("timeOptimizationNotScheduled"),
-										)}
-									</div>
-								</div>
-								<div className="rounded-md border border-primary/30 bg-primary/5 p-3">
-									<div className="text-xs font-medium text-muted-foreground">
-										{t("timeOptimizationAfter")}
-									</div>
-									<div className="mt-2 text-sm font-medium text-foreground">
-										{formatTimeRange(
-											result.after,
-											t("timeOptimizationNotScheduled"),
-										)}
-									</div>
-								</div>
+							<div className="text-sm text-muted-foreground">
+								{t("timeOptimizationAffectedCount", {
+									count: optimizationItems.length,
+								})}
 							</div>
 
-							{result.conflicts.length > 0 && (
-								<div className="rounded-md border border-border p-3">
-									<div className="text-xs font-medium text-muted-foreground">
-										{t("timeOptimizationConflictList")}
-									</div>
-									<div className="mt-2 space-y-2">
-										{result.conflicts.map((conflict) => (
+							<div className="space-y-3">
+								{optimizationItems.map((item) => (
+									<div
+										key={item.todoId}
+										className="rounded-md border border-border p-3"
+									>
+										<div className="flex min-w-0 items-center justify-between gap-3">
 											<div
-												key={conflict.id}
-												className="flex items-center justify-between gap-3 text-sm"
+												className="min-w-0"
+												style={{ marginLeft: item.depth * 12 }}
 											>
-												<span className="min-w-0 truncate text-foreground">
-													{conflict.name}
-												</span>
-												<span className="shrink-0 text-xs text-muted-foreground">
-													{formatScheduleLabel(
-														conflict.startTime,
-														conflict.endTime,
+												<div className="truncate text-sm font-medium text-foreground">
+													{item.todoName}
+												</div>
+												<div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+													<span>{statusLabels[item.status]}</span>
+													{item.depth > 0 && (
+														<span>
+															{t("timeOptimizationChildDepth", {
+																depth: item.depth,
+															})}
+														</span>
 													)}
-												</span>
+												</div>
 											</div>
-										))}
-									</div>
-								</div>
-							)}
+											<span
+												className={cn(
+													"shrink-0 rounded-sm px-2 py-0.5 text-xs font-medium",
+													item.hasConflict
+														? "bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-200"
+														: "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-200",
+												)}
+											>
+												{item.hasConflict
+													? t("timeOptimizationItemConflict", {
+															count: item.conflicts.length,
+														})
+													: t("timeOptimizationItemNoConflict")}
+											</span>
+										</div>
 
-							<div className="rounded-md border border-border p-3">
-								<div className="text-xs font-medium text-muted-foreground">
-									{t("timeOptimizationReason")}
-								</div>
-								<p className="mt-2 text-sm leading-6 text-foreground">
-									{result.reason}
-								</p>
-								<div className="mt-3 text-xs text-muted-foreground">
-									{t("timeOptimizationConfidence", {
-										value: Math.round(result.confidence * 100),
-									})}
-								</div>
+										<div className="mt-3 grid gap-3 border-t border-border pt-3 sm:grid-cols-2">
+											<div>
+												<div className="text-xs font-medium text-muted-foreground">
+													{t("timeOptimizationBefore")}
+												</div>
+												<div className="mt-1 text-sm text-foreground">
+													{formatTimeRange(
+														item.before,
+														t("timeOptimizationNotScheduled"),
+													)}
+												</div>
+											</div>
+											<div>
+												<div className="text-xs font-medium text-muted-foreground">
+													{t("timeOptimizationAfter")}
+												</div>
+												<div className="mt-1 text-sm font-medium text-foreground">
+													{formatTimeRange(
+														item.after,
+														t("timeOptimizationNotScheduled"),
+													)}
+												</div>
+											</div>
+										</div>
+
+										{item.conflicts.length > 0 && (
+											<div className="mt-3 border-t border-border pt-3">
+												<div className="text-xs font-medium text-muted-foreground">
+													{t("timeOptimizationConflictList")}
+												</div>
+												<div className="mt-2 space-y-1.5">
+													{item.conflicts.map((conflict) => (
+														<div
+															key={conflict.id}
+															className="flex items-center justify-between gap-3 text-sm"
+														>
+															<span className="min-w-0 truncate text-foreground">
+																{conflict.name}
+															</span>
+															<span className="shrink-0 text-xs text-muted-foreground">
+																{formatScheduleLabel(
+																	conflict.startTime,
+																	conflict.endTime,
+																)}
+															</span>
+														</div>
+													))}
+												</div>
+											</div>
+										)}
+
+										<div className="mt-3 border-t border-border pt-3">
+											<div className="text-xs font-medium text-muted-foreground">
+												{t("timeOptimizationReason")}
+											</div>
+											<p className="mt-1 text-sm leading-6 text-foreground">
+												{item.reason}
+											</p>
+											<div className="mt-2 text-xs text-muted-foreground">
+												{t("timeOptimizationConfidence", {
+													value: Math.round(item.confidence * 100),
+												})}
+											</div>
+										</div>
+									</div>
+								))}
 							</div>
 						</div>
 					)}

@@ -300,6 +300,7 @@ export * from './todoTimeInfoRelativeDays';
 export * from './todoTimeInfoRelativeTime';
 export * from './todoTimeInfoTimeType';
 export * from './todoTimeOptimizationConflict';
+export * from './todoTimeOptimizationItem';
 export * from './todoTimeOptimizationRange';
 export * from './todoTimeOptimizationResponse';
 export * from './todoUpdate';

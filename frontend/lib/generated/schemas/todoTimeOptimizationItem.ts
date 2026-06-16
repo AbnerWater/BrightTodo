@@ -6,17 +6,25 @@
  * OpenAPI spec version: 0.1.2
  */
 import type { TodoTimeOptimizationConflict } from './todoTimeOptimizationConflict';
-import type { TodoTimeOptimizationItem } from './todoTimeOptimizationItem';
 import type { TodoTimeOptimizationRange } from './todoTimeOptimizationRange';
 
 /**
- * AI 待办时间优化预览响应
+ * 单个待办的 AI 时间优化预览
  */
-export interface TodoTimeOptimizationResponse {
-  /** 目标待办 ID */
+export interface TodoTimeOptimizationItem {
+  /** 待优化待办 ID */
   todo_id: number;
-  /** 目标待办名称 */
+  /** 待优化待办名称 */
   todo_name: string;
+  /** 父级待办 ID */
+  parent_todo_id?: number | null;
+  /** 待办状态 */
+  status: string;
+  /**
+   * 相对目标父待办的层级深度
+   * @minimum 0
+   */
+  depth: number;
   /** 优化前时间 */
   before: TodoTimeOptimizationRange;
   /** AI 推荐时间 */
@@ -33,6 +41,4 @@ export interface TodoTimeOptimizationResponse {
    * @maximum 1
    */
   confidence: number;
-  /** 父级和参与优化子任务的逐项优化预览 */
-  items?: TodoTimeOptimizationItem[];
 }

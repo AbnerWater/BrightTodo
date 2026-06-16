@@ -6,7 +6,7 @@
  * OpenAPI spec version: 0.1.2
  */
 import type { CreatedTodo } from './createdTodo';
-import type { LifetraceSchemasFloatingCaptureExtractedTodo } from './lifetraceSchemasFloatingCaptureExtractedTodo';
+import type { ExtractedTodo } from './extractedTodo';
 
 /**
  * 悬浮窗截图响应模型
@@ -17,7 +17,7 @@ export interface FloatingCaptureResponse {
   /** 处理消息 */
   message: string;
   /** 提取的待办列表 */
-  extracted_todos?: LifetraceSchemasFloatingCaptureExtractedTodo[];
+  extracted_todos?: ExtractedTodo[];
   /** 创建的待办列表 */
   created_todos?: CreatedTodo[];
   /** 创建的待办数量 */

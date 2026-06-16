@@ -32,6 +32,7 @@ import { toastError, toastSuccess } from "@/lib/toast";
 import type {
 	CreateTodoInput,
 	Todo,
+	TodoTimeOptimizationItem,
 	TodoTimeOptimizationResponse,
 } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -42,6 +43,28 @@ import { NewTodoInlineForm } from "./NewTodoInlineForm";
 import { TodoTimeOptimizationPreviewDialog } from "./TodoTimeOptimizationPreviewDialog";
 import { TodoToolbar } from "./TodoToolbar";
 import { TodoTreeList } from "./TodoTreeList";
+
+function getTimeOptimizationItems(
+	result: TodoTimeOptimizationResponse | null,
+): TodoTimeOptimizationItem[] {
+	if (!result) return [];
+	if (result.items?.length > 0) return result.items;
+	return [
+		{
+			todoId: result.todoId,
+			todoName: result.todoName,
+			parentTodoId: null,
+			status: "active",
+			depth: 0,
+			before: result.before,
+			after: result.after,
+			hasConflict: result.hasConflict,
+			conflicts: result.conflicts,
+			reason: result.reason,
+			confidence: result.confidence,
+		},
+	];
+}
 
 export function TodoList() {
 	const tTodoList = useTranslations("todoList");
@@ -207,9 +230,10 @@ export function TodoList() {
 	);
 
 	const handleConfirmTimeOptimization = useCallback(async () => {
+		const optimizationItems = getTimeOptimizationItems(timeOptimizationResult);
 		if (
-			!timeOptimizationResult?.after.startTime ||
-			!timeOptimizationResult.after.endTime
+			optimizationItems.length === 0 ||
+			optimizationItems.some((item) => !item.after.startTime || !item.after.endTime)
 		) {
 			toastError(tTodoList("timeOptimizationMissingTime"));
 			return;
@@ -217,11 +241,22 @@ export function TodoList() {
 
 		setIsConfirmingTimeOptimization(true);
 		try {
-			await updateTodo(timeOptimizationResult.todoId, {
-				startTime: timeOptimizationResult.after.startTime,
-				endTime: timeOptimizationResult.after.endTime,
-			});
-			toastSuccess(tTodoList("timeOptimizationSuccess"));
+			for (const item of optimizationItems) {
+				const startTime = item.after.startTime;
+				const endTime = item.after.endTime;
+				if (!startTime || !endTime) {
+					throw new Error(tTodoList("timeOptimizationMissingTime"));
+				}
+				await updateTodo(item.todoId, {
+					startTime,
+					endTime,
+				});
+			}
+			toastSuccess(
+				tTodoList("timeOptimizationSuccess", {
+					count: optimizationItems.length,
+				}),
+			);
 			handleTimeOptimizationOpenChange(false);
 		} catch (err) {
 			const message = err instanceof Error ? err.message : String(err);
